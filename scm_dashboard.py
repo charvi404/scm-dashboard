@@ -636,6 +636,8 @@ elif page == "Predictive Modeling":
                 # Handle nulls in features
                 X = X.fillna(X.mean())
                 y = y.fillna(y.mean())
+                X = X.replace([np.inf, -np.inf], np.nan).fillna(X.mean())
+                y = y.replace([np.inf, -np.inf], np.nan).fillna(y.mean())
                 
                 # Train-test split
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
