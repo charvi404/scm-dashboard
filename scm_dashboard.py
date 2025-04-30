@@ -688,52 +688,52 @@ elif page == "Predictive Modeling":
             st.warning("Required features not found in dataset")
     
     elif model_type == "Supply Chain Agility Classification (Decision Tree)":
-    st.markdown("<h3>Supply Chain Agility Classification</h3>", unsafe_allow_html=True)
-    st.write("Classifies supply chain agility level using Decision Tree")
+      st.markdown("<h3>Supply Chain Agility Classification</h3>", unsafe_allow_html=True)
+      st.write("Classifies supply chain agility level using Decision Tree")
     
-    if 'Supply_Chain_Agility' in df.columns:
-        # Prepare data
-        df_tree = df.dropna(subset=['Supply_Chain_Agility'])
-        features_tree = [
-            'Lead_Time_(days)', 'Supplier_Count', 'Inventory_Turnover_Ratio'
-        ]
-        existing_features = [f for f in features_tree if f in df_tree.columns]
+      if 'Supply_Chain_Agility' in df.columns:
+          # Prepare data
+          df_tree = df.dropna(subset=['Supply_Chain_Agility'])
+          features_tree = [
+              'Lead_Time_(days)', 'Supplier_Count', 'Inventory_Turnover_Ratio'
+          ]
+          existing_features = [f for f in features_tree if f in df_tree.columns]
         
-        if len(existing_features) > 0:
-            X_tree = df_tree[existing_features]
+          if len(existing_features) > 0:
+              X_tree = df_tree[existing_features]
             
-            # Ensure we have multiple classes to classify
-            if df_tree['Supply_Chain_Agility'].nunique() > 1:
-                y_tree = LabelEncoder().fit_transform(df_tree['Supply_Chain_Agility'])
+              # Ensure we have multiple classes to classify
+              if df_tree['Supply_Chain_Agility'].nunique() > 1:
+                  y_tree = LabelEncoder().fit_transform(df_tree['Supply_Chain_Agility'])
                 
-                # Train-test split
-                X_train_tree, X_test_tree, y_train_tree, y_test_tree = train_test_split(
-                    X_tree, y_tree, test_size=0.2, random_state=42)
+                  # Train-test split
+                  X_train_tree, X_test_tree, y_train_tree, y_test_tree = train_test_split(
+                      X_tree, y_tree, test_size=0.2, random_state=42)
                 
-                # Create and fit model
-                tree_model = DecisionTreeClassifier()
-                tree_model.fit(X_train_tree, y_train_tree)
+                  # Create and fit model
+                  tree_model = DecisionTreeClassifier()
+                  tree_model.fit(X_train_tree, y_train_tree)
                 
-                # Evaluate
-                y_pred_tree = tree_model.predict(X_test_tree)
-                accuracy = accuracy_score(y_test_tree, y_pred_tree)
+                  # Evaluate
+                  y_pred_tree = tree_model.predict(X_test_tree)
+                  accuracy = accuracy_score(y_test_tree, y_pred_tree)
                 
-                st.metric("Accuracy", f"{accuracy:.3f}")
+                  st.metric("Accuracy", f"{accuracy:.3f}")
                 
-                # Feature importance
-                importance_df = pd.DataFrame({
-                    'Feature': existing_features,
-                    'Importance': tree_model.feature_importances_
-                }).sort_values('Importance', ascending=False)
+                  # Feature importance
+                  importance_df = pd.DataFrame({
+                      'Feature': existing_features,
+                      'Importance': tree_model.feature_importances_
+                  }).sort_values('Importance', ascending=False)
                 
-                st.write("Feature Importance:")
-                st.dataframe(importance_df)
-            else:
-                st.warning("Only one class found in Supply_Chain_Agility - cannot perform classification")
-        else:
-            st.warning("Required features not found in dataset")
-    else:
-        st.warning("Supply_Chain_Agility column not found in dataset")
+                  st.write("Feature Importance:")
+                  st.dataframe(importance_df)
+              else:
+                  st.warning("Only one class found in Supply_Chain_Agility - cannot perform classification")
+          else:
+              st.warning("Required features not found in dataset")
+      else:
+          st.warning("Supply_Chain_Agility column not found in dataset")
     
     elif model_type == "Carbon Emissions Prediction (Random Forest)":
         st.markdown("<h3>Carbon Emissions Prediction</h3>", unsafe_allow_html=True)
