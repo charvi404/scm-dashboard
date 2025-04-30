@@ -735,11 +735,11 @@ elif page == "Predictive Modeling":
       else:
           st.warning("Supply_Chain_Agility column not found in dataset")
     
-   elif model_type == "Carbon Emissions Prediction (Random Forest)":
-    st.markdown("<h3>Carbon Emissions Prediction</h3>", unsafe_allow_html=True)
-    st.write("Predicts carbon emissions using Random Forest regression")
+    elif model_type == "Carbon Emissions Prediction (Random Forest)":
+      st.markdown("<h3>Carbon Emissions Prediction</h3>", unsafe_allow_html=True)
+      st.write("Predicts carbon emissions using Random Forest regression")
     
-    if 'Carbon_Emissions_(kg_CO2e)' in df.columns:
+     if 'Carbon_Emissions_(kg_CO2e)' in df.columns:
         # Prepare data
         features_rf = [
             'Energy_Consumption_(MWh)', 'Use_of_Renewable_Energy_(%)',
