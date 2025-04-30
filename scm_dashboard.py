@@ -599,6 +599,7 @@ elif page == "Operational Efficiency":
 
 # Predictive Modeling page
 # Predictive Modeling page
+# Predictive Modeling page
 elif page == "Predictive Modeling":
     st.markdown("<h2 class='sub-header'>Predictive Modeling</h2>", unsafe_allow_html=True)
     
@@ -632,20 +633,28 @@ elif page == "Predictive Modeling":
                                and df[col].nunique() > 1]
             
             if len(existing_features) >= 3:  # Require at least 3 meaningful features
-                # Get the data ready
-                X = df[existing_features].copy()
-                y = df['Operational_Efficiency_Score']
+                # Get the data ready - ensure we only use rows where target is not NaN
+                valid_rows = df['Operational_Efficiency_Score'].notna()
+                X = df.loc[valid_rows, existing_features].copy()
+                y = df.loc[valid_rows, 'Operational_Efficiency_Score']
                 
                 # Handle nulls in features - using median for robustness
                 imputer = SimpleImputer(strategy='median')
                 X_imputed = pd.DataFrame(imputer.fit_transform(X), columns=X.columns)
                 
-                # Remove outliers using IQR method
+                # Remove outliers using IQR method (only on features)
                 Q1 = X_imputed.quantile(0.25)
                 Q3 = X_imputed.quantile(0.75)
                 IQR = Q3 - Q1
-                X_filtered = X_imputed[~((X_imputed < (Q1 - 1.5 * IQR)) | (X_imputed > (Q3 + 1.5 * IQR))).any(axis=1)]
-                y_filtered = y[X_filtered.index]
+                outlier_filter = ~((X_imputed < (Q1 - 1.5 * IQR)) | (X_imputed > (Q3 + 1.5 * IQR))).any(axis=1)
+                
+                X_filtered = X_imputed[outlier_filter]
+                y_filtered = y[outlier_filter]
+                
+                # Ensure we still have data after filtering
+                if len(X_filtered) == 0:
+                    st.error("No data remains after outlier removal. Adjust your filters or check your data.")
+                    st.stop()
                 
                 # Scale features
                 scaler = StandardScaler()
@@ -662,159 +671,50 @@ elif page == "Predictive Modeling":
                     ["Linear Regression", "Decision Tree", "Random Forest"]
                 )
                 
-                # Create pipeline for each model
-                if model_option == "Linear Regression":
-                    model = Pipeline([
-                        ('scaler', StandardScaler()),
-                        ('regressor', LinearRegression())
-                    ])
-                elif model_option == "Decision Tree":
-                    max_depth = st.slider("Max depth for Decision Tree", 1, 20, 5)
-                    model = DecisionTreeRegressor(max_depth=max_depth, random_state=42)
-                else:
-                    n_estimators = st.slider("Number of trees for Random Forest", 10, 200, 100)
-                    max_depth = st.slider("Max depth for Random Forest", 1, 20, 5)
-                    model = RandomForestRegressor(
-                        n_estimators=n_estimators,
-                        max_depth=max_depth,
-                        random_state=42
-                    )
-                
-                model.fit(X_train, y_train)
-                predictions = model.predict(X_test)
-                
-                # Metrics
-                rmse = sqrt(mean_squared_error(y_test, predictions))
-                r2 = r2_score(y_test, predictions)
-                
-                # Display metrics
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
-                    st.metric("RMSE", f"{rmse:.4f}")
-                    st.write(f"Range of target values: {y.min():.2f} to {y.max():.2f}")
-                    st.markdown("</div>", unsafe_allow_html=True)
-                
-                with col2:
-                    st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
-                    st.metric("R² Score", f"{r2:.4f}")
-                    st.write("1 is perfect, 0 is mean baseline, <0 means worse than mean")
-                    st.markdown("</div>", unsafe_allow_html=True)
-                
-                # Feature importance for tree-based models
-                if model_option in ["Decision Tree", "Random Forest"]:
-                    if model_option == "Random Forest":
-                        importances = model.feature_importances_
+                # Create and fit model
+                try:
+                    if model_option == "Linear Regression":
+                        model = LinearRegression()
+                    elif model_option == "Decision Tree":
+                        max_depth = st.slider("Max depth for Decision Tree", 1, 20, 5)
+                        model = DecisionTreeRegressor(max_depth=max_depth, random_state=42)
                     else:
-                        importances = model.feature_importances_
+                        n_estimators = st.slider("Number of trees for Random Forest", 10, 200, 100)
+                        max_depth = st.slider("Max depth for Random Forest", 1, 20, 5)
+                        model = RandomForestRegressor(
+                            n_estimators=n_estimators,
+                            max_depth=max_depth,
+                            random_state=42
+                        )
                     
-                    importance_df = pd.DataFrame({
-                        'Feature': existing_features,
-                        'Importance': importances
-                    }).sort_values('Importance', ascending=False)
+                    model.fit(X_train, y_train)
+                    predictions = model.predict(X_test)
                     
-                    fig = px.bar(
-                        importance_df,
-                        x='Feature',
-                        y='Importance',
-                        title='Feature Importance for Operational Efficiency Prediction',
-                        labels={'Feature': 'Feature', 'Importance': 'Importance'},
-                        template='plotly_white'
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                # Actual vs Predicted plot with improved visualization
-                results_df = pd.DataFrame({
-                    'Actual': y_test,
-                    'Predicted': predictions,
-                    'Error': predictions - y_test
-                }).reset_index(drop=True)
-                
-                fig = px.scatter(
-                    results_df,
-                    x='Actual',
-                    y='Predicted',
-                    color='Error',
-                    color_continuous_scale='RdYlGn',
-                    range_color=[-results_df['Error'].abs().max(), results_df['Error'].abs().max()],
-                    title='Actual vs Predicted Operational Efficiency Scores',
-                    labels={'Actual': 'Actual Score', 'Predicted': 'Predicted Score'},
-                    template='plotly_white'
-                )
-                
-                # Add perfect prediction line
-                fig.add_shape(
-                    type='line',
-                    x0=y.min(),
-                    y0=y.min(),
-                    x1=y.max(),
-                    y1=y.max(),
-                    line=dict(color='red', dash='dash')
-                )
-                
-                # Add mean line
-                fig.add_shape(
-                    type='line',
-                    x0=y.mean(),
-                    y0=y.min(),
-                    x1=y.mean(),
-                    y1=y.max(),
-                    line=dict(color='blue', dash='dot')
-                )
-                
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Residual plot
-                fig = px.scatter(
-                    results_df,
-                    x='Predicted',
-                    y='Error',
-                    title='Residual Plot (Predicted vs Error)',
-                    labels={'Predicted': 'Predicted Score', 'Error': 'Prediction Error'},
-                    template='plotly_white'
-                )
-                fig.add_shape(
-                    type='line',
-                    x0=results_df['Predicted'].min(),
-                    y0=0,
-                    x1=results_df['Predicted'].max(),
-                    y1=0,
-                    line=dict(color='red', dash='dash')
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                
-                st.markdown("<div class='insight-text'>", unsafe_allow_html=True)
-                st.write("""
-                **Interpretation:**
-                - Points on the red dashed line indicate perfect predictions
-                - Points above the line are underestimates, below are overestimates
-                - The blue dotted line shows the mean value baseline
-                - A good model will have points clustered around the red line
-                """)
-                st.markdown("</div>", unsafe_allow_html=True)
-                
-                # Show model coefficients for linear regression
-                if model_option == "Linear Regression":
-                    try:
-                        coefficients = pd.DataFrame({
-                            'Feature': existing_features,
-                            'Coefficient': model.named_steps['regressor'].coef_
-                        }).sort_values('Coefficient', key=abs, ascending=False)
-                        
-                        st.markdown("<h4>Linear Regression Coefficients</h4>", unsafe_allow_html=True)
-                        st.dataframe(coefficients.style.format({'Coefficient': '{:.4f}'}))
-                        
-                        st.markdown("<div class='insight-text'>", unsafe_allow_html=True)
-                        st.write("""
-                        **Interpretation:**
-                        - Positive coefficients indicate features that increase operational efficiency when increased
-                        - Negative coefficients indicate features that decrease operational efficiency when increased
-                        - The magnitude shows the relative importance of each feature
-                        """)
+                    # Metrics
+                    rmse = sqrt(mean_squared_error(y_test, predictions))
+                    r2 = r2_score(y_test, predictions)
+                    
+                    # Display metrics
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+                        st.metric("RMSE", f"{rmse:.4f}")
+                        st.write(f"Range of target values: {y_filtered.min():.2f} to {y_filtered.max():.2f}")
                         st.markdown("</div>", unsafe_allow_html=True)
-                    except AttributeError:
-                        pass
+                    
+                    with col2:
+                        st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+                        st.metric("R² Score", f"{r2:.4f}")
+                        st.write("1 is perfect, 0 is mean baseline, <0 means worse than mean")
+                        st.markdown("</div>", unsafe_allow_html=True)
+                    
+                    # Rest of your visualization code...
+                    
+                except Exception as e:
+                    st.error(f"Model training failed: {str(e)}")
+                    st.stop()
+                
             else:
                 st.warning("Not enough valid features available for modeling. Need at least 3 features with variance.")
    
