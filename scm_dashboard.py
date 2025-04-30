@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeRegressor
-from sklearn.metrics import mean_squared_error, r2_score, classification_report
+from sklearn.metrics import mean_squared_error, r2_score, classification_report, accuracy_score
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
@@ -688,19 +688,22 @@ elif page == "Predictive Modeling":
             st.warning("Required features not found in dataset")
     
     elif model_type == "Supply Chain Agility Classification (Decision Tree)":
-        st.markdown("<h3>Supply Chain Agility Classification</h3>", unsafe_allow_html=True)
-        st.write("Classifies supply chain agility level using Decision Tree")
+    st.markdown("<h3>Supply Chain Agility Classification</h3>", unsafe_allow_html=True)
+    st.write("Classifies supply chain agility level using Decision Tree")
+    
+    if 'Supply_Chain_Agility' in df.columns:
+        # Prepare data
+        df_tree = df.dropna(subset=['Supply_Chain_Agility'])
+        features_tree = [
+            'Lead_Time_(days)', 'Supplier_Count', 'Inventory_Turnover_Ratio'
+        ]
+        existing_features = [f for f in features_tree if f in df_tree.columns]
         
-        if 'Supply_Chain_Agility' in df.columns:
-            # Prepare data
-            df_tree = df.dropna(subset=['Supply_Chain_Agility'])
-            features_tree = [
-                'Lead_Time_(days)', 'Supplier_Count', 'Inventory_Turnover_Ratio'
-            ]
-            existing_features = [f for f in features_tree if f in df_tree.columns]
+        if len(existing_features) > 0:
+            X_tree = df_tree[existing_features]
             
-            if len(existing_features) > 0:
-                X_tree = df_tree[existing_features]
+            # Ensure we have multiple classes to classify
+            if df_tree['Supply_Chain_Agility'].nunique() > 1:
                 y_tree = LabelEncoder().fit_transform(df_tree['Supply_Chain_Agility'])
                 
                 # Train-test split
@@ -726,9 +729,11 @@ elif page == "Predictive Modeling":
                 st.write("Feature Importance:")
                 st.dataframe(importance_df)
             else:
-                st.warning("Required features not found in dataset")
+                st.warning("Only one class found in Supply_Chain_Agility - cannot perform classification")
         else:
-            st.warning("Supply_Chain_Agility column not found in dataset")
+            st.warning("Required features not found in dataset")
+    else:
+        st.warning("Supply_Chain_Agility column not found in dataset")
     
     elif model_type == "Carbon Emissions Prediction (Random Forest)":
         st.markdown("<h3>Carbon Emissions Prediction</h3>", unsafe_allow_html=True)
@@ -1059,6 +1064,6 @@ elif page == "About":
     st.markdown("Note: This dashboard is for demonstration purposes only.")
 
 # Run the app
-if _name_ == "_main_":
+if __name__ == "__main__":
     # This part is automatically handled by Streamlit when the script is run
     pass
