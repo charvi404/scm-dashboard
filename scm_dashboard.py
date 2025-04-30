@@ -26,6 +26,7 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import LabelEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
+from sklearn.model_selection import cross_val_score
 # Page configuration
 st.set_page_config(
     page_title="Supply Chain Management Analytics",
@@ -805,6 +806,11 @@ elif page == "Predictive Modeling":
             
             X, y, preprocessor, existing_features = preprocess_data(
                 df, 'Risk_Category', feature_cols)
+            rf_model = RandomForestRegressor(
+    n_estimators=50,      # Fewer trees to reduce overfitting
+    max_depth=5,          # Shallower trees
+    random_state=42       # For reproducibility
+)
             
             if len(existing_features) > 0:
                 # Train-test split
@@ -879,6 +885,9 @@ elif page == "Predictive Modeling":
                 st.warning("Required features not found in dataset")
         else:
             st.warning("Supply_Chain_Risk_(%) column not found in dataset")
+        scores = cross_val_score(rf_model, X_rf, y_rf, cv=5, scoring='r2')
+        st.write("Cross-Validated R² Scores:", scores)
+        st.write("Average R²:", np.mean(scores))
     
     elif model_type == "Carbon Emissions Prediction (Gradient Boosting)":
         st.markdown("<h3>Carbon Emissions Prediction</h3>", unsafe_allow_html=True)
