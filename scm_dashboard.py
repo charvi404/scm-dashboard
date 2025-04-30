@@ -736,54 +736,89 @@ elif page == "Predictive Modeling":
           st.warning("Supply_Chain_Agility column not found in dataset")
     
     elif model_type == "Carbon Emissions Prediction (Random Forest)":
-        st.markdown("<h3>Carbon Emissions Prediction</h3>", unsafe_allow_html=True)
-        st.write("Predicts carbon emissions using Random Forest regression")
+    st.markdown("<h3>Carbon Emissions Prediction</h3>", unsafe_allow_html=True)
+    st.write("Predicts carbon emissions using Random Forest regression")
+    
+    if 'Carbon_Emissions_(kg_CO2e)' in df.columns:
+        # Prepare data
+        features_rf = [
+            'Energy_Consumption_(MWh)', 'Use_of_Renewable_Energy_(%)',
+            'Recycling_Rate_(%)', 'Green_Packaging_Usage_(%)',
+            'Total_Implementation_Cost'
+        ]
+        existing_features = [f for f in features_rf if f in df.columns]
         
-        if 'Carbon_Emissions_(kg_CO2e)' in df.columns:
-            # Prepare data
-            features_rf = [
-                'Energy_Consumption_(MWh)', 'Use_of_Renewable_Energy_(%)',
-                'Recycling_Rate_(%)', 'Green_Packaging_Usage_(%)',
-                'Total_Implementation_Cost'
-            ]
-            existing_features = [f for f in features_rf if f in df.columns]
+        if len(existing_features) > 0:
+            df_rf = df.dropna(subset=['Carbon_Emissions_(kg_CO2e)'] + existing_features)
             
-            if len(existing_features) > 0:
-                df_rf = df.dropna(subset=['Carbon_Emissions_(kg_CO2e)'] + existing_features)
-                X_rf = df_rf[existing_features]
-                y_rf = df_rf['Carbon_Emissions_(kg_CO2e)']
-                
-                # Train-test split
-                X_train_rf, X_test_rf, y_train_rf, y_test_rf = train_test_split(
-                    X_rf, y_rf, test_size=0.2, random_state=42)
-                
-                # Create and fit model
-                rf_model = RandomForestRegressor()
-                rf_model.fit(X_train_rf, y_train_rf)
-                
-                # Evaluate
-                y_pred_rf = rf_model.predict(X_test_rf)
-                r2 = r2_score(y_test_rf, y_pred_rf)
-                rmse = np.sqrt(mean_squared_error(y_test_rf, y_pred_rf))
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("R² Score", f"{r2:.3f}")
-                with col2:
-                    st.metric("RMSE", f"{rmse:.3f}")
-                
-                # Feature importance
-                importance_df = pd.DataFrame({
-                    'Feature': existing_features,
-                    'Importance': rf_model.feature_importances_
-                }).sort_values('Importance', ascending=False)
-                
-                st.write("Feature Importance:")
-                st.dataframe(importance_df)
-            else:
-                st.warning("Required features not found in dataset")
+            # Check for duplicate rows
+            if df_rf.duplicated().sum() > 0:
+                st.warning(f"Found {df_rf.duplicated().sum()} duplicate rows - removing them")
+                df_rf = df_rf.drop_duplicates()
+            
+            X_rf = df_rf[existing_features]
+            y_rf = df_rf['Carbon_Emissions_(kg_CO2e)']
+            
+            # Add parameter controls
+            col1, col2 = st.columns(2)
+            with col1:
+                n_estimators = st.slider("Number of trees", 10, 200, 50)
+            with col2:
+                max_depth = st.slider("Max tree depth", 2, 20, 5)
+            
+            # Train-test split with stratification if possible
+            X_train_rf, X_test_rf, y_train_rf, y_test_rf = train_test_split(
+                X_rf, y_rf, test_size=0.3, random_state=42)  # Increased test size
+            
+            # Create and fit model with constrained parameters
+            rf_model = RandomForestRegressor(
+                n_estimators=n_estimators,
+                max_depth=max_depth,
+                min_samples_split=5,  # Require at least 5 samples to split
+                random_state=42
+            )
+            rf_model.fit(X_train_rf, y_train_rf)
+            
+            # Evaluate
+            y_pred_rf = rf_model.predict(X_test_rf)
+            r2 = r2_score(y_test_rf, y_pred_rf)
+            rmse = np.sqrt(mean_squared_error(y_test_rf, y_pred_rf))
+            
+            # Cross-validation for more reliable metrics
+            from sklearn.model_selection import cross_val_score
+            cv_scores = cross_val_score(rf_model, X_rf, y_rf, cv=5, scoring='r2')
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("R² Score", f"{r2:.3f}")
+            with col2:
+                st.metric("RMSE", f"{rmse:.3f}")
+            with col3:
+                st.metric("CV R² (mean)", f"{np.mean(cv_scores):.3f}")
+            
+            # Feature importance
+            importance_df = pd.DataFrame({
+                'Feature': existing_features,
+                'Importance': rf_model.feature_importances_
+            }).sort_values('Importance', ascending=False)
+            
+            st.write("Feature Importance:")
+            st.dataframe(importance_df)
+            
+            # Plot actual vs predicted
+            fig = px.scatter(
+                x=y_test_rf, y=y_pred_rf,
+                labels={'x': 'Actual', 'y': 'Predicted'},
+                title='Actual vs Predicted Carbon Emissions',
+                trendline='ols'
+            )
+            fig.add_shape(type="line", x0=y_test_rf.min(), y0=y_test_rf.min(),
+                         x1=y_test_rf.max(), y1=y_test_rf.max())
+            st.plotly_chart(fig)
         else:
-            st.warning("Carbon_Emissions_(kg_CO2e) column not found in dataset")
+            st.warning("Required features not found in dataset")
+    else:
+        st.warning("Carbon_Emissions_(kg_CO2e) column not found in dataset")
     
     elif model_type == "Sustainability Practices Classification (Gradient Boosting)":
         st.markdown("<h3>Sustainability Practices Classification</h3>", unsafe_allow_html=True)
