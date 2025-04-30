@@ -14,7 +14,12 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from math import sqrt
 from wordcloud import WordCloud
-
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestRegressor
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import LabelEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
 # Page configuration
 st.set_page_config(
     page_title="Supply Chain Management Analytics",
@@ -161,14 +166,14 @@ if page == "Overview":
     # Display dataset info
     col1, col2 = st.columns(2)
     with col1:
-        st.write(f"**Total Companies:** {df['Company_Name'].nunique()}")
-        st.write(f"**Total SCM Practices:** {df['SCM_Practices'].nunique()}")
-        st.write(f"**Average Lead Time:** {df['Lead_Time_(days)'].mean():.2f} days")
+        st.write(f"*Total Companies:* {df['Company_Name'].nunique()}")
+        st.write(f"*Total SCM Practices:* {df['SCM_Practices'].nunique()}")
+        st.write(f"*Average Lead Time:* {df['Lead_Time_(days)'].mean():.2f} days")
     
     with col2:
-        st.write(f"**Average Customer Satisfaction:** {df['Customer_Satisfaction_(%)'].mean():.2f}%")
-        st.write(f"**Average Inventory Accuracy:** {df['Inventory_Accuracy_(%)'].mean():.2f}%")
-        st.write(f"**Average Order Fulfillment Rate:** {df['Order_Fulfillment_Rate_(%)'].mean():.2f}%")
+        st.write(f"*Average Customer Satisfaction:* {df['Customer_Satisfaction_(%)'].mean():.2f}%")
+        st.write(f"*Average Inventory Accuracy:* {df['Inventory_Accuracy_(%)'].mean():.2f}%")
+        st.write(f"*Average Order Fulfillment Rate:* {df['Order_Fulfillment_Rate_(%)'].mean():.2f}%")
     
     # Show dataset
     with st.expander("View Dataset", expanded=False):
@@ -330,7 +335,7 @@ elif page == "SCM Practices Analysis":
         st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
         st.subheader("Best Practices by Metric")
         for metric, data in best_practices.items():
-            st.write(f"**{metric.replace('_', ' ')}:** {data['practice']} ({data['value']:.2f})")
+            st.write(f"{metric.replace('_', ' ')}:** {data['practice']} ({data['value']:.2f})")
         st.markdown("</div>", unsafe_allow_html=True)
     
     with col2:
@@ -538,8 +543,8 @@ elif page == "Operational Efficiency":
             y=y_metric,
             color='SCM_Type',
             hover_name='Company_Name',
-            title=f'Relationship between {x_metric.replace("_", " ")} and {y_metric.replace("_", " ")}',
-            labels={x_metric: x_metric.replace('_', ' '), y_metric: y_metric.replace('_', ' ')},
+            title=f'Relationship between {x_metric.replace("", " ")} and {y_metric.replace("", " ")}',
+            labels={x_metric: x_metric.replace('', ' '), y_metric: y_metric.replace('', ' ')},
             trendline="ols",
             template='plotly_white'
         )
@@ -547,7 +552,7 @@ elif page == "Operational Efficiency":
         
         st.markdown("<div class='insight-text'>", unsafe_allow_html=True)
         st.write(f"""
-        This scatter plot shows the relationship between {x_metric.replace('_', ' ')} and {y_metric.replace('_', ' ')} across companies.
+        This scatter plot shows the relationship between {x_metric.replace('', ' ')} and {y_metric.replace('', ' ')} across companies.
         The trendline indicates the general relationship between these metrics.
         Colors represent different SCM types to identify any patterns by strategy.
         """)
@@ -601,12 +606,7 @@ elif page == "Operational Efficiency":
 # Predictive Modeling page
 # Predictive Modeling page# Predictive Modeling page
 # In your imports section, add these if not already present:
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestRegressor
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import LabelEncoder
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
+
 
 # Then update your Predictive Modeling section:
 
@@ -995,18 +995,18 @@ elif page == "About":
     
     ### Key Features
     
-    - **Overview**: High-level view of key metrics and top-performing companies
-    - **SCM Practices Analysis**: In-depth analysis of different SCM practices and their performance
-    - **Sustainability Metrics**: Analysis of environmental impact and sustainability practices
-    - **Operational Efficiency**: Analysis of operational metrics and their relationships
-    - **Predictive Modeling**: Machine learning models to predict operational efficiency and SCM type
+    - *Overview*: High-level view of key metrics and top-performing companies
+    - *SCM Practices Analysis*: In-depth analysis of different SCM practices and their performance
+    - *Sustainability Metrics*: Analysis of environmental impact and sustainability practices
+    - *Operational Efficiency*: Analysis of operational metrics and their relationships
+    - *Predictive Modeling*: Machine learning models to predict operational efficiency and SCM type
     
     ### Technologies Used
     
-    - **Streamlit**: For application framework and UI
-    - **Pandas**: For data manipulation and analysis
-    - **Plotly & Matplotlib**: For data visualization
-    - **Scikit-learn**: For predictive modeling
+    - *Streamlit*: For application framework and UI
+    - *Pandas*: For data manipulation and analysis
+    - *Plotly & Matplotlib*: For data visualization
+    - *Scikit-learn*: For predictive modeling
     
     ### Contact
     
@@ -1056,9 +1056,9 @@ elif page == "About":
     
     # Disclaimer
     st.markdown("---")
-    st.markdown("*Note: This dashboard is for demonstration purposes only.*")
+    st.markdown("Note: This dashboard is for demonstration purposes only.")
 
 # Run the app
-if __name__ == "__main__":
+if _name_ == "_main_":
     # This part is automatically handled by Streamlit when the script is run
     pass
