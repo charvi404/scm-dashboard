@@ -817,7 +817,7 @@ elif page == "Predictive Modeling":
             st.plotly_chart(fig)
         else:
             st.warning("Required features not found in dataset")
-    else:
+     else:
         st.warning("Carbon_Emissions_(kg_CO2e) column not found in dataset")
     
     elif model_type == "Sustainability Practices Classification (Gradient Boosting)":
