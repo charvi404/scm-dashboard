@@ -4,12 +4,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
 import numpy as np
-import plotly.graph_objects as go
-from sklearn.metrics import confusion_matrix, silhouette_score
-from sklearn.decomposition import PCA
-from sklearn.ensemble import GradientBoostingRegressor, VotingClassifier
-from xgboost import XGBRegressor, XGBClassifier
-from sklearn.preprocessing import OneHotEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.linear_model import LinearRegression
@@ -26,7 +20,6 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import LabelEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import cross_val_score
 # Page configuration
 st.set_page_config(
     page_title="Supply Chain Management Analytics",
@@ -621,593 +614,371 @@ elif page == "Predictive Modeling":
     st.markdown("<h2 class='sub-header'>Advanced Predictive Modeling</h2>", unsafe_allow_html=True)
     
     st.write("""
-    This section demonstrates robust machine learning approaches for supply chain analytics,
-    with improved data preprocessing and model evaluation.
+    This section demonstrates multiple machine learning approaches for supply chain analytics,
+    including regression, classification, and clustering techniques.
     """)
     
     # Model type selection
     model_type = st.selectbox(
         "Select modeling approach:",
-        [
-            "Revenue Growth Prediction (XGBoost)",
-            "Supply Chain Risk Classification (Random Forest)",
-            "Carbon Emissions Prediction (Gradient Boosting)",
-            "SCM Type Classification (Ensemble)",
-            "Operational Clustering (K-Means)"
-        ]
+        ["Revenue Growth Prediction (Linear Regression)",
+         "Supply Chain Agility Classification (Decision Tree)",
+         "Carbon Emissions Prediction (Random Forest)",
+         "Sustainability Practices Classification (Gradient Boosting)",
+         "Operational Clustering (K-Means)"]
     )
     
-    # Common preprocessing function
-    def preprocess_data(df, target_col, feature_cols):
-        """Handle missing values, scaling, and encoding"""
-        df = df.dropna(subset=[target_col])
-        
-        # Only use features that exist in dataframe
-        existing_features = [f for f in feature_cols if f in df.columns]
-        X = df[existing_features]
-        y = df[target_col]
-        
-        # Handle missing values in features
-        numeric_cols = X.select_dtypes(include=np.number).columns
-        cat_cols = X.select_dtypes(exclude=np.number).columns
-        
-        numeric_transformer = Pipeline(steps=[
-            ('imputer', SimpleImputer(strategy='median')),
-            ('scaler', StandardScaler())
-        ])
-        
-        categorical_transformer = Pipeline(steps=[
-            ('imputer', SimpleImputer(strategy='most_frequent')),
-            ('encoder', OneHotEncoder(handle_unknown='ignore'))
-        ])
-        
-        preprocessor = ColumnTransformer(
-            transformers=[
-                ('num', numeric_transformer, numeric_cols),
-                ('cat', categorical_transformer, cat_cols)
-            ])
-        
-        return X, y, preprocessor, existing_features
-    
-    if model_type == "Revenue Growth Prediction (XGBoost)":
+    if model_type == "Revenue Growth Prediction (Linear Regression)":
         st.markdown("<h3>Revenue Growth Rate Prediction</h3>", unsafe_allow_html=True)
-        st.write("Predicts revenue growth using XGBoost with feature importance analysis")
+        st.write("Predicts revenue growth based on operational metrics using Linear Regression")
         
         # Prepare data
-        feature_cols = [
+        df_lr = df.dropna(subset=['Revenue_Growth_Rate_out_of_(15)'])
+        features_lr = [
             'Order_Fulfillment_Rate_(%)', 'Operational_Efficiency_Score',
             'Customer_Satisfaction_(%)', 'Supply_Chain_Resilience_Score',
-            'Supplier_Relationship_Score', 'Inventory_Turnover_Ratio',
-            'Lead_Time_(days)', 'SCM_Type'
+            'Supplier_Relationship_Score'
         ]
         
-        X, y, preprocessor, existing_features = preprocess_data(
-            df, 'Revenue_Growth_Rate_out_of_(15)', feature_cols)
+        # Only include features that exist in the dataframe
+        existing_features = [f for f in features_lr if f in df_lr.columns]
+        X_lr = df_lr[existing_features]
+        y_lr = df_lr['Revenue_Growth_Rate_out_of_(15)']
         
         if len(existing_features) > 0:
             # Train-test split
-            X_train, X_test, y_train, y_test = train_test_split(
-                X, y, test_size=0.2, random_state=42)
+            X_train_lr, X_test_lr, y_train_lr, y_test_lr = train_test_split(
+                X_lr, y_lr, test_size=0.2, random_state=42)
             
-            # Create pipeline with XGBoost
-            model = Pipeline(steps=[
-                ('preprocessor', preprocessor),
-                ('regressor', XGBRegressor(random_state=42))
-            ])
-            
-            # Train model
-            with st.spinner('Training model...'):
-                model.fit(X_train, y_train)
+            # Create and fit model
+            lr_model = LinearRegression()
+            lr_model.fit(X_train_lr, y_train_lr)
             
             # Evaluate
-            y_pred = model.predict(X_test)
-            r2 = r2_score(y_test, y_pred)
-            rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-            mae = mean_absolute_error(y_test, y_pred)
+            y_pred_lr = lr_model.predict(X_test_lr)
+            r2 = r2_score(y_test_lr, y_pred_lr)
+            rmse = np.sqrt(mean_squared_error(y_test_lr, y_pred_lr))
             
-            # Display metrics
-            col1, col2, col3 = st.columns(3)
+            # Display results
+            col1, col2 = st.columns(2)
             with col1:
-                st.metric("R² Score", f"{r2:.3f}", 
-                         help="Proportion of variance explained by model (1 is perfect)")
+                st.metric("R² Score", f"{r2:.3f}")
             with col2:
-                st.metric("RMSE", f"{rmse:.3f}", 
-                         help="Root Mean Squared Error (lower is better)")
-            with col3:
-                st.metric("MAE", f"{mae:.3f}", 
-                         help="Mean Absolute Error (lower is better)")
+                st.metric("RMSE", f"{rmse:.3f}")
             
             # Feature importance
-            try:
-                # For XGBoost, we need to get feature names after preprocessing
-                feature_names = []
-                for name, trans, cols in preprocessor.transformers_:
-                    if name == 'num':
-                        feature_names.extend(cols)
-                    elif name == 'cat':
-                        # Get one-hot encoded feature names
-                        ohe = trans.named_steps['encoder']
-                        feature_names.extend(ohe.get_feature_names_out(cols))
-                
-                importances = model.named_steps['regressor'].feature_importances_
-                importance_df = pd.DataFrame({
-                    'Feature': feature_names,
-                    'Importance': importances
-                }).sort_values('Importance', ascending=False).head(10)
-                
-                st.write("Top 10 Feature Importances:")
-                fig = px.bar(
-                    importance_df,
-                    x='Feature',
-                    y='Importance',
-                    title='Feature Importance for Revenue Growth Prediction',
-                    labels={'Feature': 'Feature', 'Importance': 'Importance'},
-                    template='plotly_white'
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            except Exception as e:
-                st.warning(f"Could not display feature importance: {str(e)}")
+            coef_df = pd.DataFrame({
+                'Feature': existing_features,
+                'Coefficient': lr_model.coef_
+            }).sort_values('Coefficient', key=abs, ascending=False)
             
-            # Actual vs Predicted plot with trendline
+            st.write("Feature Coefficients:")
+            st.dataframe(coef_df)
+            
+            # Actual vs Predicted plot
             fig = px.scatter(
-                x=y_test, y=y_pred,
+                x=y_test_lr, y=y_pred_lr,
                 labels={'x': 'Actual', 'y': 'Predicted'},
-                title='Actual vs Predicted Revenue Growth',
-                trendline="ols",
-                trendline_color_override="red"
+                title='Actual vs Predicted Revenue Growth'
             )
-            fig.update_layout(
-                xaxis_title="Actual Revenue Growth Rate",
-                yaxis_title="Predicted Revenue Growth Rate"
-            )
-            fig.add_shape(
-                type="line", line=dict(dash='dash'),
-                x0=y_test.min(), y0=y_test.min(),
-                x1=y_test.max(), y1=y_test.max()
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Residual plot
-            residuals = y_test - y_pred
-            fig = px.scatter(
-                x=y_pred, y=residuals,
-                labels={'x': 'Predicted', 'y': 'Residuals'},
-                title='Residual Plot',
-                trendline="ols",
-                trendline_color_override="red"
-            )
-            fig.add_hline(y=0, line_dash="dash")
-            fig.update_layout(
-                xaxis_title="Predicted Values",
-                yaxis_title="Residuals (Actual - Predicted)"
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            fig.add_shape(type="line", x0=y_test_lr.min(), y0=y_test_lr.min(),
+                         x1=y_test_lr.max(), y1=y_test_lr.max())
+            st.plotly_chart(fig)
         else:
             st.warning("Required features not found in dataset")
     
-    elif model_type == "Supply Chain Risk Classification (Random Forest)":
-        st.markdown("<h3>Supply Chain Risk Classification</h3>", unsafe_allow_html=True)
-        st.write("Classifies companies into risk categories using Random Forest")
-        
-        # Create risk categories if not exists
-        if 'Supply_Chain_Risk_(%)' in df.columns:
-            df['Risk_Category'] = pd.cut(
-                df['Supply_Chain_Risk_(%)'],
-                bins=[0, 25, 50, 75, 100],
-                labels=['Low', 'Medium', 'High', 'Critical']
-            )
-            
-            # Prepare data
-            feature_cols = [
-                'Lead_Time_(days)', 'Supplier_Count', 
-                'Inventory_Turnover_Ratio', 'Order_Fulfillment_Rate_(%)',
-                'Customer_Satisfaction_(%)', 'SCM_Type'
-            ]
-            
-            X, y, preprocessor, existing_features = preprocess_data(
-                df, 'Risk_Category', feature_cols)
-            rf_model = RandomForestRegressor(
-    n_estimators=50,      # Fewer trees to reduce overfitting
-    max_depth=5,          # Shallower trees
-    random_state=42       # For reproducibility
-)
-            
-            if len(existing_features) > 0:
-                # Train-test split
-                X_train, X_test, y_train, y_test = train_test_split(
-                    X, y, test_size=0.2, random_state=42, stratify=y)
-                
-                # Create pipeline with Random Forest
-                model = Pipeline(steps=[
-                    ('preprocessor', preprocessor),
-                    ('classifier', RandomForestClassifier(random_state=42))
-                ])
-                
-                # Train model
-                with st.spinner('Training model...'):
-                    model.fit(X_train, y_train)
-                
-                # Evaluate
-                y_pred = model.predict(X_test)
-                accuracy = accuracy_score(y_test, y_pred)
-                report = classification_report(y_test, y_pred, output_dict=True)
-                
-                # Display metrics
-                st.metric("Accuracy", f"{accuracy:.3f}")
-                
-                # Confusion matrix
-                st.write("Confusion Matrix:")
-                cm = confusion_matrix(y_test, y_pred)
-                fig = px.imshow(
-                    cm,
-                    labels=dict(x="Predicted", y="Actual", color="Count"),
-                    x=model.classes_,
-                    y=model.classes_,
-                    text_auto=True,
-                    aspect="auto"
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Classification report
-                st.write("Classification Report:")
-                report_df = pd.DataFrame(report).transpose()
-                st.dataframe(report_df.style.format("{:.3f}"))
-                
-                # Feature importance
-                try:
-                    feature_names = []
-                    for name, trans, cols in preprocessor.transformers_:
-                        if name == 'num':
-                            feature_names.extend(cols)
-                        elif name == 'cat':
-                            ohe = trans.named_steps['encoder']
-                            feature_names.extend(ohe.get_feature_names_out(cols))
-                    
-                    importances = model.named_steps['classifier'].feature_importances_
-                    importance_df = pd.DataFrame({
-                        'Feature': feature_names,
-                        'Importance': importances
-                    }).sort_values('Importance', ascending=False).head(10)
-                    
-                    st.write("Top 10 Feature Importances:")
-                    fig = px.bar(
-                        importance_df,
-                        x='Feature',
-                        y='Importance',
-                        title='Feature Importance for Risk Classification',
-                        labels={'Feature': 'Feature', 'Importance': 'Importance'},
-                        template='plotly_white'
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                except Exception as e:
-                    st.warning(f"Could not display feature importance: {str(e)}")
-            else:
-                st.warning("Required features not found in dataset")
-        else:
-            st.warning("Supply_Chain_Risk_(%) column not found in dataset")
-        scores = cross_val_score(rf_model, X_rf, y_rf, cv=5, scoring='r2')
-        st.write("Cross-Validated R² Scores:", scores)
-        st.write("Average R²:", np.mean(scores))
+    elif model_type == "Supply Chain Agility Classification (Decision Tree)":
+      st.markdown("<h3>Supply Chain Agility Classification</h3>", unsafe_allow_html=True)
+      st.write("Classifies supply chain agility level using Decision Tree")
     
-    elif model_type == "Carbon Emissions Prediction (Gradient Boosting)":
+      if 'Supply_Chain_Agility' in df.columns:
+          # Prepare data
+          df_tree = df.dropna(subset=['Supply_Chain_Agility'])
+          features_tree = [
+              'Lead_Time_(days)', 'Supplier_Count', 'Inventory_Turnover_Ratio'
+          ]
+          existing_features = [f for f in features_tree if f in df_tree.columns]
+        
+          if len(existing_features) > 0:
+              X_tree = df_tree[existing_features]
+            
+              # Ensure we have multiple classes to classify
+              if df_tree['Supply_Chain_Agility'].nunique() > 1:
+                  y_tree = LabelEncoder().fit_transform(df_tree['Supply_Chain_Agility'])
+                
+                  # Train-test split
+                  X_train_tree, X_test_tree, y_train_tree, y_test_tree = train_test_split(
+                      X_tree, y_tree, test_size=0.2, random_state=42)
+                
+                  # Create and fit model
+                  tree_model = DecisionTreeClassifier()
+                  tree_model.fit(X_train_tree, y_train_tree)
+                
+                  # Evaluate
+                  y_pred_tree = tree_model.predict(X_test_tree)
+                  accuracy = accuracy_score(y_test_tree, y_pred_tree)
+                
+                  st.metric("Accuracy", f"{accuracy:.3f}")
+                
+                  # Feature importance
+                  importance_df = pd.DataFrame({
+                      'Feature': existing_features,
+                      'Importance': tree_model.feature_importances_
+                  }).sort_values('Importance', ascending=False)
+                
+                  st.write("Feature Importance:")
+                  st.dataframe(importance_df)
+              else:
+                  st.warning("Only one class found in Supply_Chain_Agility - cannot perform classification")
+          else:
+              st.warning("Required features not found in dataset")
+      else:
+          st.warning("Supply_Chain_Agility column not found in dataset")
+    
+    elif model_type == "Carbon Emissions Prediction (Random Forest)":
         st.markdown("<h3>Carbon Emissions Prediction</h3>", unsafe_allow_html=True)
-        st.write("Predicts carbon emissions using Gradient Boosting with early stopping")
+        st.write("Predicts carbon emissions using Random Forest regression")
         
         if 'Carbon_Emissions_(kg_CO2e)' in df.columns:
             # Prepare data
-            feature_cols = [
+            features_rf = [
                 'Energy_Consumption_(MWh)', 'Use_of_Renewable_Energy_(%)',
                 'Recycling_Rate_(%)', 'Green_Packaging_Usage_(%)',
-                'Total_Implementation_Cost', 'SCM_Type'
+                'Total_Implementation_Cost'
             ]
-            
-            X, y, preprocessor, existing_features = preprocess_data(
-                df, 'Carbon_Emissions_(kg_CO2e)', feature_cols)
+            existing_features = [f for f in features_rf if f in df.columns]
             
             if len(existing_features) > 0:
+                df_rf = df.dropna(subset=['Carbon_Emissions_(kg_CO2e)'] + existing_features)
+                X_rf = df_rf[existing_features]
+                y_rf = df_rf['Carbon_Emissions_(kg_CO2e)']
+                
                 # Train-test split
-                X_train, X_test, y_train, y_test = train_test_split(
-                    X, y, test_size=0.2, random_state=42)
+                X_train_rf, X_test_rf, y_train_rf, y_test_rf = train_test_split(
+                    X_rf, y_rf, test_size=0.2, random_state=42)
                 
-                # Create pipeline with Gradient Boosting
-                model = Pipeline(steps=[
-                    ('preprocessor', preprocessor),
-                    ('regressor', GradientBoostingRegressor(
-                        n_estimators=500,
-                        learning_rate=0.01,
-                        random_state=42,
-                        validation_fraction=0.2,
-                        n_iter_no_change=10
-                    ))
-                ])
-                
-                # Train model with progress bar
-                with st.spinner('Training model (this may take a few minutes)...'):
-                    model.fit(X_train, y_train)
-                    n_estimators = len(model.named_steps['regressor'].estimators_)
-                    st.success(f"Training completed with {n_estimators} estimators")
+                # Create and fit model
+                rf_model = RandomForestRegressor()
+                rf_model.fit(X_train_rf, y_train_rf)
                 
                 # Evaluate
-                y_pred = model.predict(X_test)
-                r2 = r2_score(y_test, y_pred)
-                rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-                mae = mean_absolute_error(y_test, y_pred)
+                y_pred_rf = rf_model.predict(X_test_rf)
+                r2 = r2_score(y_test_rf, y_pred_rf)
+                rmse = np.sqrt(mean_squared_error(y_test_rf, y_pred_rf))
                 
-                # Display metrics
-                col1, col2, col3 = st.columns(3)
+                col1, col2 = st.columns(2)
                 with col1:
                     st.metric("R² Score", f"{r2:.3f}")
                 with col2:
                     st.metric("RMSE", f"{rmse:.3f}")
-                with col3:
-                    st.metric("MAE", f"{mae:.3f}")
-                
-                # Learning curve
-                st.write("Model Learning Curve:")
-                regressor = model.named_steps['regressor']
-                train_score = regressor.train_score_
-                val_score = regressor.validation_score_
-                
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=np.arange(len(train_score)),
-                    y=train_score,
-                    name='Training Score'
-                ))
-                fig.add_trace(go.Scatter(
-                    x=np.arange(len(val_score)),
-                    y=val_score,
-                    name='Validation Score'
-                ))
-                fig.update_layout(
-                    title='Gradient Boosting Learning Curve',
-                    xaxis_title='Number of Boosting Iterations',
-                    yaxis_title='Score (R²)'
-                )
-                st.plotly_chart(fig, use_container_width=True)
                 
                 # Feature importance
-                try:
-                    feature_names = []
-                    for name, trans, cols in preprocessor.transformers_:
-                        if name == 'num':
-                            feature_names.extend(cols)
-                        elif name == 'cat':
-                            ohe = trans.named_steps['encoder']
-                            feature_names.extend(ohe.get_feature_names_out(cols))
-                    
-                    importances = model.named_steps['regressor'].feature_importances_
-                    importance_df = pd.DataFrame({
-                        'Feature': feature_names,
-                        'Importance': importances
-                    }).sort_values('Importance', ascending=False).head(10)
-                    
-                    st.write("Top 10 Feature Importances:")
-                    fig = px.bar(
-                        importance_df,
-                        x='Feature',
-                        y='Importance',
-                        title='Feature Importance for Carbon Emissions Prediction',
-                        labels={'Feature': 'Feature', 'Importance': 'Importance'},
-                        template='plotly_white'
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                except Exception as e:
-                    st.warning(f"Could not display feature importance: {str(e)}")
+                importance_df = pd.DataFrame({
+                    'Feature': existing_features,
+                    'Importance': rf_model.feature_importances_
+                }).sort_values('Importance', ascending=False)
+                
+                st.write("Feature Importance:")
+                st.dataframe(importance_df)
             else:
                 st.warning("Required features not found in dataset")
         else:
             st.warning("Carbon_Emissions_(kg_CO2e) column not found in dataset")
     
-    elif model_type == "SCM Type Classification (Ensemble)":
-        st.markdown("<h3>SCM Type Classification</h3>", unsafe_allow_html=True)
-        st.write("Classifies SCM types using Voting Classifier with multiple algorithms")
+    elif model_type == "Sustainability Practices Classification (Gradient Boosting)":
+        st.markdown("<h3>Sustainability Practices Classification</h3>", unsafe_allow_html=True)
+        st.write("Classifies sustainability practices using Gradient Boosting")
         
-        if 'SCM_Type' in df.columns:
+        if 'Sustainability_Practices' in df.columns:
             # Prepare data
-            feature_cols = [
-                'Supplier_Count', 'Inventory_Turnover_Ratio', 
-                'Lead_Time_(days)', 'Order_Fulfillment_Rate_(%)',
-                'Customer_Satisfaction_(%)', 'Environmental_Impact_Score',
-                'Inventory_Accuracy_(%)', 'Transportation_Cost_Efficiency_(%)'
+            features_gb = [
+                'Use_of_Renewable_Energy_(%)', 'Green_Packaging_Usage_(%)',
+                'Recycling_Rate_(%)', 'Carbon_Emissions_(kg_CO2e)'
             ]
-            
-            X, y, preprocessor, existing_features = preprocess_data(
-                df, 'SCM_Type', feature_cols)
+            existing_features = [f for f in features_gb if f in df.columns]
             
             if len(existing_features) > 0:
+                df_gb = df.dropna(subset=['Sustainability_Practices'] + existing_features)
+                X_gb = df_gb[existing_features]
+                y_gb = LabelEncoder().fit_transform(df_gb['Sustainability_Practices'])
+                
                 # Train-test split
-                X_train, X_test, y_train, y_test = train_test_split(
-                    X, y, test_size=0.2, random_state=42, stratify=y)
+                X_train_gb, X_test_gb, y_train_gb, y_test_gb = train_test_split(
+                    X_gb, y_gb, test_size=0.2, random_state=42)
                 
-                # Create ensemble model
-                estimators = [
-                    ('rf', RandomForestClassifier(random_state=42)),
-                    ('gb', GradientBoostingClassifier(random_state=42)),
-                    ('xgb', XGBClassifier(random_state=42, eval_metric='mlogloss'))
-                ]
-                
-                model = Pipeline(steps=[
-                    ('preprocessor', preprocessor),
-                    ('classifier', VotingClassifier(estimators=estimators, voting='soft'))
-                ])
-                
-                # Train model
-                with st.spinner('Training ensemble model (this may take a few minutes)...'):
-                    model.fit(X_train, y_train)
+                # Create and fit model
+                gb_model = GradientBoostingClassifier()
+                gb_model.fit(X_train_gb, y_train_gb)
                 
                 # Evaluate
-                y_pred = model.predict(X_test)
-                accuracy = accuracy_score(y_test, y_pred)
-                report = classification_report(y_test, y_pred, output_dict=True)
+                y_pred_gb = gb_model.predict(X_test_gb)
+                accuracy = accuracy_score(y_test_gb, y_pred_gb)
                 
-                # Display metrics
                 st.metric("Accuracy", f"{accuracy:.3f}")
                 
-                # Confusion matrix
-                st.write("Confusion Matrix:")
-                cm = confusion_matrix(y_test, y_pred)
-                fig = px.imshow(
-                    cm,
-                    labels=dict(x="Predicted", y="Actual", color="Count"),
-                    x=model.classes_,
-                    y=model.classes_,
-                    text_auto=True,
-                    aspect="auto"
-                )
-                st.plotly_chart(fig, use_container_width=True)
+                # Feature importance
+                importance_df = pd.DataFrame({
+                    'Feature': existing_features,
+                    'Importance': gb_model.feature_importances_
+                }).sort_values('Importance', ascending=False)
                 
-                # Classification report
-                st.write("Classification Report:")
-                report_df = pd.DataFrame(report).transpose()
-                st.dataframe(report_df.style.format("{:.3f}"))
-                
-                # Feature importance (average from all models)
-                try:
-                    feature_names = []
-                    for name, trans, cols in preprocessor.transformers_:
-                        if name == 'num':
-                            feature_names.extend(cols)
-                        elif name == 'cat':
-                            ohe = trans.named_steps['encoder']
-                            feature_names.extend(ohe.get_feature_names_out(cols))
-                    
-                    # Get feature importances from each model
-                    importances = []
-                    for name, clf in model.named_steps['classifier'].named_estimators_.items():
-                        if hasattr(clf, 'feature_importances_'):
-                            importances.append(clf.feature_importances_)
-                    
-                    if importances:
-                        avg_importances = np.mean(importances, axis=0)
-                        importance_df = pd.DataFrame({
-                            'Feature': feature_names,
-                            'Importance': avg_importances
-                        }).sort_values('Importance', ascending=False).head(10)
-                        
-                        st.write("Top 10 Feature Importances (Average):")
-                        fig = px.bar(
-                            importance_df,
-                            x='Feature',
-                            y='Importance',
-                            title='Feature Importance for SCM Type Classification',
-                            labels={'Feature': 'Feature', 'Importance': 'Importance'},
-                            template='plotly_white'
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                except Exception as e:
-                    st.warning(f"Could not display feature importance: {str(e)}")
+                st.write("Feature Importance:")
+                st.dataframe(importance_df)
             else:
                 st.warning("Required features not found in dataset")
         else:
-            st.warning("SCM_Type column not found in dataset")
+            st.warning("Sustainability_Practices column not found in dataset")
     
     elif model_type == "Operational Clustering (K-Means)":
         st.markdown("<h3>Operational Performance Clustering</h3>", unsafe_allow_html=True)
-        st.write("Groups companies into clusters based on operational metrics using K-Means with silhouette analysis")
+        st.write("Groups companies into clusters based on operational metrics using K-Means")
         
         # Prepare data
-        feature_cols = [
+        features_kmeans = [
             'Inventory_Accuracy_(%)', 'Transportation_Cost_Efficiency_(%)',
             'Operational_Efficiency_Score', 'Supply_Chain_Risk_(%)',
             'Supplier_Relationship_Score'
         ]
-        
-        existing_features = [f for f in feature_cols if f in df.columns]
+        existing_features = [f for f in features_kmeans if f in df.columns]
         
         if len(existing_features) > 0:
-            # Select only numeric features and drop missing values
-            df_cluster = df[existing_features].select_dtypes(include=np.number).dropna()
+            df_kmeans = df[existing_features].dropna()
             
             # Scale data
             scaler = StandardScaler()
-            X_scaled = scaler.fit_transform(df_cluster)
+            X_kmeans = scaler.fit_transform(df_kmeans)
             
-            # Silhouette analysis to determine optimal clusters
-            st.write("Silhouette Analysis for Optimal Cluster Count:")
+            # Determine optimal clusters (elbow method)
+            distortions = []
+            K = range(1, 10)
+            for k in K:
+                kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+                kmeans.fit(X_kmeans)
+                distortions.append(kmeans.inertia_)
             
-            range_n_clusters = range(2, 8)
-            silhouette_scores = []
-            
-            for n_clusters in range_n_clusters:
-                clusterer = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-                cluster_labels = clusterer.fit_predict(X_scaled)
-                silhouette_avg = silhouette_score(X_scaled, cluster_labels)
-                silhouette_scores.append(silhouette_avg)
-            
-            # Plot silhouette scores
-            fig = px.line(
-                x=list(range_n_clusters), 
-                y=silhouette_scores,
-                labels={'x': 'Number of Clusters', 'y': 'Average Silhouette Score'},
-                title='Silhouette Analysis for Optimal K'
-            )
-            fig.update_layout(
-                xaxis=dict(tickmode='linear', tick0=2, dtick=1)
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            # Plot elbow curve
+            fig1 = px.line(x=list(K), y=distortions, 
+                          labels={'x': 'Number of clusters', 'y': 'Distortion'},
+                          title='Elbow Method for Optimal K')
+            st.plotly_chart(fig1)
             
             # Let user select number of clusters
-            optimal_k = np.argmax(silhouette_scores) + 2  # +2 because range starts at 2
-            n_clusters = st.slider(
-                "Select number of clusters", 
-                min_value=2, 
-                max_value=7, 
-                value=optimal_k
-            )
+            n_clusters = st.slider("Select number of clusters", 2, 8, 3)
             
             # Fit K-Means with selected clusters
             kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-            cluster_labels = kmeans.fit_predict(X_scaled)
+            kmeans.fit(X_kmeans)
             
             # Add cluster labels to dataframe
-            df_cluster['Cluster'] = cluster_labels
+            df_kmeans['Cluster'] = kmeans.labels_
             
             # Show cluster distribution
             st.write("Cluster Distribution:")
-            st.bar_chart(df_cluster['Cluster'].value_counts())
+            st.bar_chart(df_kmeans['Cluster'].value_counts())
             
             # Show cluster characteristics
-            cluster_means = df_cluster.groupby('Cluster').mean()
+            cluster_means = df_kmeans.groupby('Cluster').mean()
             st.write("Cluster Characteristics (mean values):")
-            st.dataframe(cluster_means.style.background_gradient(cmap='Blues'))
-            
-            # PCA for visualization
-            pca = PCA(n_components=2)
-            X_pca = pca.fit_transform(X_scaled)
-            
-            # Create plot
-            plot_df = pd.DataFrame({
-                'PCA1': X_pca[:, 0],
-                'PCA2': X_pca[:, 1],
-                'Cluster': cluster_labels
-            })
-            
-            fig = px.scatter(
-                plot_df,
-                x='PCA1',
-                y='PCA2',
-                color='Cluster',
-                title='Cluster Visualization (PCA Reduced)',
-                labels={'PCA1': 'Principal Component 1', 'PCA2': 'Principal Component 2'},
-                template='plotly_white'
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Parallel coordinates plot
-            st.write("Parallel Coordinates Plot:")
-            parallel_df = df_cluster.copy()
-            parallel_df['Cluster'] = parallel_df['Cluster'].astype(str)
-            
-            fig = px.parallel_coordinates(
-                parallel_df,
-                color='Cluster',
-                labels={col: col.replace('_', ' ') for col in parallel_df.columns},
-                title='Parallel Coordinates Plot of Clusters'
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            st.dataframe(cluster_means)
         else:
             st.warning("Required features not found in dataset")
+   
+                
+    else:  # Predict SCM Type
+        st.markdown("<h3>SCM Type Classification</h3>", unsafe_allow_html=True)
+        
+        if 'SCM_Type' in df.columns:
+            # Feature selection
+            feature_cols = [
+                'Supplier_Count', 'Inventory_Turnover_Ratio', 'Lead_Time_(days)',
+                'Order_Fulfillment_Rate_(%)', 'Customer_Satisfaction_(%)',
+                'Environmental_Impact_Score', 'Supplier_Lead_Time_Variability_(days)',
+                'Inventory_Accuracy_(%)', 'Transportation_Cost_Efficiency_(%)']
+            
+            # Check which features exist
+            existing_features = [col for col in feature_cols if col in df.columns]
+            
+            if len(existing_features) > 2:
+                # Get the data ready
+                X = df[existing_features].copy()
+                y = df['SCM_Type']
+                
+                # Handle nulls in features
+                X = X.fillna(X.mean())
+                
+                # Encode the target
+                le = LabelEncoder()
+                y_encoded = le.fit_transform(y)
+                
+                # Train-test split
+                X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, random_state=42)
+                
+                # Train model
+                model = RandomForestClassifier(random_state=42)
+                model.fit(X_train, y_train)
+                predictions = model.predict(X_test)
+                
+                # Metrics
+                class_report = classification_report(y_test, predictions, output_dict=True)
+                accuracy = class_report['accuracy']
+                
+                # Display metrics
+                st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+                st.metric("Classification Accuracy", f"{accuracy:.4f}")
+                st.markdown("</div>", unsafe_allow_html=True)
+                
+                # Display classification report as table
+                report_df = pd.DataFrame(class_report).transpose()
+                st.write("Classification Report:")
+                st.dataframe(report_df.style.format("{:.4f}"))
+                
+                # Feature importance
+                importances = pd.DataFrame({
+                    'Feature': existing_features,
+                    'Importance': model.feature_importances_
+                }).sort_values('Importance', ascending=False)
+                
+                fig = px.bar(
+                    importances,
+                    x='Feature',
+                    y='Importance',
+                    title='Feature Importance for SCM Type Classification',
+                    labels={'Feature': 'Feature', 'Importance': 'Importance'},
+                    template='plotly_white'
+                )
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Create a sample prediction tool
+                st.markdown("<h3>SCM Type Prediction Tool</h3>", unsafe_allow_html=True)
+                st.write("Adjust the values below to see the predicted SCM Type for a company with these characteristics:")
+                
+                # Create sliders for feature input
+                feature_inputs = {}
+                for feature in existing_features:
+                    min_val = float(df[feature].min())
+                    max_val = float(df[feature].max())
+                    mean_val = float(df[feature].mean())
+                    
+                    feature_inputs[feature] = st.slider(
+                        f"{feature.replace('_', ' ')}",
+                        min_value=min_val,
+                        max_value=max_val,
+                        value=mean_val,
+                        step=(max_val - min_val) / 100
+                    )
+                
+                # Create input dataframe
+                input_df = pd.DataFrame([feature_inputs])
+                
+                # Make prediction
+                prediction = model.predict(input_df)[0]
+                predicted_class = le.inverse_transform([prediction])[0]
+                
+                st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+                st.subheader("Predicted SCM Type")
+                st.info(f"{predicted_class}")
+                st.markdown("</div>", unsafe_allow_html=True)
+
 # About page
 elif page == "About":
     st.markdown("<h2 class='sub-header'>About This Dashboard</h2>", unsafe_allow_html=True)
