@@ -599,7 +599,7 @@ elif page == "Operational Efficiency":
 
 # Predictive Modeling page
 # Predictive Modeling page
-# Predictive Modeling page
+# Predictive Modeling page# Predictive Modeling page
 elif page == "Predictive Modeling":
     st.markdown("<h2 class='sub-header'>Predictive Modeling</h2>", unsafe_allow_html=True)
     
@@ -627,16 +627,25 @@ elif page == "Predictive Modeling":
                 'Supply_Chain_Complexity_Index', 'Revenue_Growth_Rate_out_of_(15)'
             ]
             
-            # Check which features exist and have non-zero variance
-            existing_features = [col for col in feature_cols 
-                               if col in df.columns 
-                               and df[col].nunique() > 1]
+            # Check which features exist, have non-zero variance, and are numeric
+            existing_features = []
+            for col in feature_cols:
+                if col in df.columns:
+                    if pd.api.types.is_numeric_dtype(df[col]) and df[col].nunique() > 1:
+                        existing_features.append(col)
+            
+            st.write(f"Available features for modeling: {', '.join(existing_features)}")
             
             if len(existing_features) >= 3:  # Require at least 3 meaningful features
-                # Get the data ready - ensure we only use rows where target is not NaN
-                valid_rows = df['Operational_Efficiency_Score'].notna()
-                X = df.loc[valid_rows, existing_features].copy()
-                y = df.loc[valid_rows, 'Operational_Efficiency_Score']
+                # Create clean dataframe with only needed columns
+                model_df = df[existing_features + ['Operational_Efficiency_Score']].copy()
+                
+                # Remove rows where target is NaN or infinite
+                model_df = model_df[np.isfinite(model_df['Operational_Efficiency_Score'])]
+                
+                # Separate features and target
+                X = model_df[existing_features]
+                y = model_df['Operational_Efficiency_Score']
                 
                 # Handle nulls in features - using median for robustness
                 imputer = SimpleImputer(strategy='median')
@@ -656,6 +665,8 @@ elif page == "Predictive Modeling":
                     st.error("No data remains after outlier removal. Adjust your filters or check your data.")
                     st.stop()
                 
+                st.write(f"Final dataset size for modeling: {len(X_filtered)} rows")
+                
                 # Scale features
                 scaler = StandardScaler()
                 X_scaled = scaler.fit_transform(X_filtered)
@@ -671,22 +682,23 @@ elif page == "Predictive Modeling":
                     ["Linear Regression", "Decision Tree", "Random Forest"]
                 )
                 
-                # Create and fit model
+                # Model parameters
+                if model_option == "Decision Tree":
+                    max_depth = st.slider("Max depth for Decision Tree", 1, 20, 5)
+                    model = DecisionTreeRegressor(max_depth=max_depth, random_state=42)
+                elif model_option == "Random Forest":
+                    n_estimators = st.slider("Number of trees", 10, 200, 100)
+                    max_depth = st.slider("Max depth", 1, 20, 5)
+                    model = RandomForestRegressor(
+                        n_estimators=n_estimators,
+                        max_depth=max_depth,
+                        random_state=42
+                    )
+                else:
+                    model = LinearRegression()
+                
+                # Train model with error handling
                 try:
-                    if model_option == "Linear Regression":
-                        model = LinearRegression()
-                    elif model_option == "Decision Tree":
-                        max_depth = st.slider("Max depth for Decision Tree", 1, 20, 5)
-                        model = DecisionTreeRegressor(max_depth=max_depth, random_state=42)
-                    else:
-                        n_estimators = st.slider("Number of trees for Random Forest", 10, 200, 100)
-                        max_depth = st.slider("Max depth for Random Forest", 1, 20, 5)
-                        model = RandomForestRegressor(
-                            n_estimators=n_estimators,
-                            max_depth=max_depth,
-                            random_state=42
-                        )
-                    
                     model.fit(X_train, y_train)
                     predictions = model.predict(X_test)
                     
@@ -700,23 +712,67 @@ elif page == "Predictive Modeling":
                     with col1:
                         st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
                         st.metric("RMSE", f"{rmse:.4f}")
-                        st.write(f"Range of target values: {y_filtered.min():.2f} to {y_filtered.max():.2f}")
+                        st.write(f"Target range: {y_filtered.min():.2f} to {y_filtered.max():.2f}")
                         st.markdown("</div>", unsafe_allow_html=True)
                     
                     with col2:
                         st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
                         st.metric("R² Score", f"{r2:.4f}")
-                        st.write("1 is perfect, 0 is mean baseline, <0 means worse than mean")
+                        st.write("1=perfect, 0=mean baseline, <0=worse than mean")
                         st.markdown("</div>", unsafe_allow_html=True)
                     
-                    # Rest of your visualization code...
+                    # Feature importance for tree-based models
+                    if model_option in ["Decision Tree", "Random Forest"]:
+                        importances = model.feature_importances_
+                        importance_df = pd.DataFrame({
+                            'Feature': existing_features,
+                            'Importance': importances
+                        }).sort_values('Importance', ascending=False)
+                        
+                        fig = px.bar(
+                            importance_df,
+                            x='Feature',
+                            y='Importance',
+                            title='Feature Importance',
+                            labels={'Feature': 'Feature', 'Importance': 'Importance'},
+                            template='plotly_white'
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Actual vs Predicted plot
+                    results_df = pd.DataFrame({
+                        'Actual': y_test,
+                        'Predicted': predictions
+                    })
+                    
+                    fig = px.scatter(
+                        results_df,
+                        x='Actual',
+                        y='Predicted',
+                        title='Actual vs Predicted Values',
+                        labels={'Actual': 'Actual Score', 'Predicted': 'Predicted Score'},
+                        trendline="lowess",
+                        template='plotly_white'
+                    )
+                    fig.add_shape(
+                        type='line',
+                        x0=y.min(),
+                        y0=y.min(),
+                        x1=y.max(),
+                        y1=y.max(),
+                        line=dict(color='red', dash='dash')
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
                     
                 except Exception as e:
                     st.error(f"Model training failed: {str(e)}")
                     st.stop()
                 
             else:
-                st.warning("Not enough valid features available for modeling. Need at least 3 features with variance.")
+                st.warning(f"Not enough valid features for modeling (need 3, found {len(existing_features)}). Check your data.")
+                st.write("Current numeric features in dataset:")
+                numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
+                st.write(numeric_cols)
    
                 
     else:  # Predict SCM Type
