@@ -20,6 +20,7 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import LabelEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
+from sklearn.ensemble import GradientBoostingRegressor
 # Page configuration
 st.set_page_config(
     page_title="Supply Chain Management Analytics",
@@ -615,137 +616,142 @@ elif page == "Predictive Modeling":
     
     st.write("""
     Compare how different models perform at predicting key supply chain metrics.
-    Select a target variable to see which features and models work best.
     """)
     
-    # Target selection
-    target_options = [
-        'Revenue_Growth_Rate_out_of_(15)',
-        'Operational_Efficiency_Score',
-        'Carbon_Emissions_(kg_CO2e)',
-        'Customer_Satisfaction_(%)',
-        'Lead_Time_(days)'
-    ]
-    target_var = st.selectbox("Select target variable to predict:", 
-                            [opt for opt in target_options if opt in df.columns])
-    
-    # Feature selection (automatically select relevant numeric features)
-    numeric_features = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
-    feature_options = [f for f in numeric_features if f != target_var]
-    selected_features = st.multiselect("Select features to use:", 
-                                     feature_options,
-                                     default=feature_options[:5])
-    
-    if target_var and selected_features:
+    try:
+        # Target selection
+        available_targets = [
+            'Revenue_Growth_Rate_out_of_(15)',
+            'Operational_Efficiency_Score', 
+            'Customer_Satisfaction_(%)',
+            'Lead_Time_(days)'
+        ]
+        # Only show targets that exist in the dataframe
+        valid_targets = [t for t in available_targets if t in df.columns]
+        
+        if not valid_targets:
+            st.warning("No valid target variables found in the dataset")
+            st.stop()
+            
+        target_var = st.selectbox("Select target variable to predict:", valid_targets)
+        
+        # Feature selection - auto-select relevant numeric features
+        numeric_features = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
+        feature_options = [f for f in numeric_features if f != target_var and f in df.columns]
+        
+        if not feature_options:
+            st.warning("No valid features found for prediction")
+            st.stop()
+            
+        selected_features = st.multiselect(
+            "Select features to use:", 
+            feature_options,
+            default=feature_options[:min(5, len(feature_options))]
+        )
+        
+        if not selected_features:
+            st.warning("Please select at least one feature")
+            st.stop()
+
         # Prepare data
         model_df = df[[target_var] + selected_features].dropna()
+        
+        if len(model_df) < 20:
+            st.warning(f"Only {len(model_df)} samples available after cleaning - too few for reliable modeling")
+            st.stop()
+            
         X = model_df[selected_features]
         y = model_df[target_var]
         
         # Train-test split
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.3, random_state=42
+        )
         
-        # Model selection
+        # Model selection - simplified with constrained parameters
         models = {
             "Linear Regression": LinearRegression(),
-            "Decision Tree": DecisionTreeRegressor(max_depth=5),
-            "Random Forest": RandomForestRegressor(n_estimators=50, max_depth=5),
-            "Gradient Boosting": GradientBoostingRegressor(n_estimators=50, max_depth=3)
+            "Decision Tree": DecisionTreeRegressor(max_depth=3, random_state=42),
+            "Random Forest": RandomForestRegressor(
+                n_estimators=50, 
+                max_depth=3, 
+                random_state=42
+            ),
+            "Gradient Boosting": GradientBoostingRegressor(
+                n_estimators=50, 
+                max_depth=3, 
+                random_state=42
+            )
         }
         
         # Evaluate models
         results = []
-        feature_importances = {}
-        
         for name, model in models.items():
-            # Train model
-            model.fit(X_train, y_train)
-            
-            # Predictions
-            y_pred = model.predict(X_test)
-            
-            # Metrics
-            rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-            r2 = r2_score(y_test, y_pred)
-            
-            results.append({
-                "Model": name,
-                "RMSE": rmse,
-                "R²": r2
-            })
-            
-            # Store feature importances if available
-            if hasattr(model, 'feature_importances_'):
-                feature_importances[name] = {
-                    "features": selected_features,
-                    "importance": model.feature_importances_
-                }
+            try:
+                model.fit(X_train, y_train)
+                y_pred = model.predict(X_test)
+                rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+                r2 = r2_score(y_test, y_pred)
+                results.append({
+                    "Model": name,
+                    "RMSE": f"{rmse:.2f}",
+                    "R²": f"{r2:.2f}",
+                    "Features": ", ".join(selected_features[:3]) + ("..." if len(selected_features)>3 else "")
+                })
+            except Exception as e:
+                st.error(f"Error with {name}: {str(e)}")
+                continue
         
+        if not results:
+            st.error("No models could be successfully trained")
+            st.stop()
+            
         # Display results
-        st.markdown("### Model Performance Comparison")
-        results_df = pd.DataFrame(results).sort_values("R²", ascending=False)
-        st.dataframe(results_df.style.format({"RMSE": "{:.2f}", "R²": "{:.2f}"}))
+        st.markdown("### Model Performance")
+        results_df = pd.DataFrame(results)
+        st.dataframe(
+            results_df.sort_values("R²", ascending=False),
+            hide_index=True
+        )
         
         # Best model insights
-        best_model = results_df.iloc[0]
+        best_row = results_df.iloc[0]
         st.markdown(f"""
-        **Best Model:** {best_model['Model']}  
-        - **R²:** {best_model['R²']:.2f} (1.0 is perfect prediction)  
-        - **RMSE:** {best_model['RMSE']:.2f} (lower is better)
+        **Best Model:** `{best_row['Model']}`  
+        - **R²:** {best_row['R²']} (1.0 is perfect)  
+        - **RMSE:** {best_row['RMSE']} (lower is better)
         """)
         
-        # Feature importance visualization
-        if feature_importances:
-            st.markdown("### Feature Importance (Top Models)")
-            
-            # Show feature importance for tree-based models
-            tab1, tab2 = st.tabs(["Random Forest", "Gradient Boosting"])
-            
-            with tab1:
-                if "Random Forest" in feature_importances:
+        # Feature importance for tree models
+        st.markdown("### Feature Importance")
+        tree_models = {
+            "Decision Tree": models["Decision Tree"],
+            "Random Forest": models["Random Forest"],
+            "Gradient Boosting": models["Gradient Boosting"]
+        }
+        
+        tabs = st.tabs(list(tree_models.keys()))
+        for tab, (name, model) in zip(tabs, tree_models.items()):
+            with tab:
+                if hasattr(model, 'feature_importances_'):
+                    importance_df = pd.DataFrame({
+                        'Feature': selected_features,
+                        'Importance': model.feature_importances_
+                    }).sort_values('Importance', ascending=False)
+                    
                     fig = px.bar(
-                        x=feature_importances["Random Forest"]["features"],
-                        y=feature_importances["Random Forest"]["importance"],
-                        labels={'x': 'Feature', 'y': 'Importance'},
-                        title="Random Forest Feature Importance"
+                        importance_df,
+                        x='Feature',
+                        y='Importance',
+                        title=f'{name} Feature Importance'
                     )
                     st.plotly_chart(fig, use_container_width=True)
-            
-            with tab2:
-                if "Gradient Boosting" in feature_importances:
-                    fig = px.bar(
-                        x=feature_importances["Gradient Boosting"]["features"],
-                        y=feature_importances["Gradient Boosting"]["importance"],
-                        labels={'x': 'Feature', 'y': 'Importance'},
-                        title="Gradient Boosting Feature Importance"
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-        
-        # Actual vs Predicted plot for best model
-        st.markdown("### Actual vs Predicted Values")
-        best_model_instance = models[best_model['Model']]
-        y_pred = best_model_instance.predict(X_test)
-        
-        fig = px.scatter(
-            x=y_test, y=y_pred,
-            labels={'x': 'Actual', 'y': 'Predicted'},
-            title=f'{best_model["Model"]} Predictions vs Actual',
-            trendline='ols'
-        )
-        fig.add_shape(type="line", x0=y_test.min(), y0=y_test.min(),
-                     x1=y_test.max(), y1=y_test.max())
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Key insights
-        st.markdown("### Key Insights")
-        st.write(f"""
-        1. **Best Performing Model:** {best_model['Model']} works best for predicting {target_var.replace('_', ' ')}
-        2. **Feature Importance:** The most important features are shown above
-        3. **Model Fit:** R² of {best_model['R²']:.2f} indicates {'strong' if best_model['R²'] > 0.7 else 'moderate' if best_model['R²'] > 0.4 else 'weak'} relationship
-        4. **Error Range:** Average prediction error is ±{best_model['RMSE']:.2f} units
-        """)
-    else:
-        st.warning("Please select both a target variable and features to proceed")# About page
+                else:
+                    st.warning(f"{name} doesn't provide feature importances")
+    
+    except Exception as e:
+        st.error(f"An unexpected error occurred: {str(e)}")
+        st.stop()
 elif page == "About":
     st.markdown("<h2 class='sub-header'>About This Dashboard</h2>", unsafe_allow_html=True)
     
