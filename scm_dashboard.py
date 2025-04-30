@@ -611,410 +611,141 @@ elif page == "Operational Efficiency":
 # Then update your Predictive Modeling section:
 
 elif page == "Predictive Modeling":
-    st.markdown("<h2 class='sub-header'>Advanced Predictive Modeling</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='sub-header'>Predictive Model Comparison</h2>", unsafe_allow_html=True)
     
     st.write("""
-    This section demonstrates multiple machine learning approaches for supply chain analytics,
-    including regression, classification, and clustering techniques.
+    Compare how different models perform at predicting key supply chain metrics.
+    Select a target variable to see which features and models work best.
     """)
     
-    # Model type selection
-    model_type = st.selectbox(
-        "Select modeling approach:",
-        ["Revenue Growth Prediction (Linear Regression)",
-         "Supply Chain Agility Classification (Decision Tree)",
-         "Carbon Emissions Prediction (Random Forest)",
-         "Sustainability Practices Classification (Gradient Boosting)",
-         "Operational Clustering (K-Means)"]
-    )
+    # Target selection
+    target_options = [
+        'Revenue_Growth_Rate_out_of_(15)',
+        'Operational_Efficiency_Score',
+        'Carbon_Emissions_(kg_CO2e)',
+        'Customer_Satisfaction_(%)',
+        'Lead_Time_(days)'
+    ]
+    target_var = st.selectbox("Select target variable to predict:", 
+                            [opt for opt in target_options if opt in df.columns])
     
-    if model_type == "Revenue Growth Prediction (Linear Regression)":
-        st.markdown("<h3>Revenue Growth Rate Prediction</h3>", unsafe_allow_html=True)
-        st.write("Predicts revenue growth based on operational metrics using Linear Regression")
-        
+    # Feature selection (automatically select relevant numeric features)
+    numeric_features = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
+    feature_options = [f for f in numeric_features if f != target_var]
+    selected_features = st.multiselect("Select features to use:", 
+                                     feature_options,
+                                     default=feature_options[:5])
+    
+    if target_var and selected_features:
         # Prepare data
-        df_lr = df.dropna(subset=['Revenue_Growth_Rate_out_of_(15)'])
-        features_lr = [
-            'Order_Fulfillment_Rate_(%)', 'Operational_Efficiency_Score',
-            'Customer_Satisfaction_(%)', 'Supply_Chain_Resilience_Score',
-            'Supplier_Relationship_Score'
-        ]
+        model_df = df[[target_var] + selected_features].dropna()
+        X = model_df[selected_features]
+        y = model_df[target_var]
         
-        # Only include features that exist in the dataframe
-        existing_features = [f for f in features_lr if f in df_lr.columns]
-        X_lr = df_lr[existing_features]
-        y_lr = df_lr['Revenue_Growth_Rate_out_of_(15)']
+        # Train-test split
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
         
-        if len(existing_features) > 0:
-            # Train-test split
-            X_train_lr, X_test_lr, y_train_lr, y_test_lr = train_test_split(
-                X_lr, y_lr, test_size=0.2, random_state=42)
-            
-            # Create and fit model
-            lr_model = LinearRegression()
-            lr_model.fit(X_train_lr, y_train_lr)
-            
-            # Evaluate
-            y_pred_lr = lr_model.predict(X_test_lr)
-            r2 = r2_score(y_test_lr, y_pred_lr)
-            rmse = np.sqrt(mean_squared_error(y_test_lr, y_pred_lr))
-            
-            # Display results
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("R² Score", f"{r2:.3f}")
-            with col2:
-                st.metric("RMSE", f"{rmse:.3f}")
-            
-            # Feature importance
-            coef_df = pd.DataFrame({
-                'Feature': existing_features,
-                'Coefficient': lr_model.coef_
-            }).sort_values('Coefficient', key=abs, ascending=False)
-            
-            st.write("Feature Coefficients:")
-            st.dataframe(coef_df)
-            
-            # Actual vs Predicted plot
-            fig = px.scatter(
-                x=y_test_lr, y=y_pred_lr,
-                labels={'x': 'Actual', 'y': 'Predicted'},
-                title='Actual vs Predicted Revenue Growth'
-            )
-            fig.add_shape(type="line", x0=y_test_lr.min(), y0=y_test_lr.min(),
-                         x1=y_test_lr.max(), y1=y_test_lr.max())
-            st.plotly_chart(fig)
-        else:
-            st.warning("Required features not found in dataset")
-    
-    elif model_type == "Supply Chain Agility Classification (Decision Tree)":
-      st.markdown("<h3>Supply Chain Agility Classification</h3>", unsafe_allow_html=True)
-      st.write("Classifies supply chain agility level using Decision Tree")
-    
-      if 'Supply_Chain_Agility' in df.columns:
-          # Prepare data
-          df_tree = df.dropna(subset=['Supply_Chain_Agility'])
-          features_tree = [
-              'Lead_Time_(days)', 'Supplier_Count', 'Inventory_Turnover_Ratio'
-          ]
-          existing_features = [f for f in features_tree if f in df_tree.columns]
+        # Model selection
+        models = {
+            "Linear Regression": LinearRegression(),
+            "Decision Tree": DecisionTreeRegressor(max_depth=5),
+            "Random Forest": RandomForestRegressor(n_estimators=50, max_depth=5),
+            "Gradient Boosting": GradientBoostingRegressor(n_estimators=50, max_depth=3)
+        }
         
-          if len(existing_features) > 0:
-              X_tree = df_tree[existing_features]
-            
-              # Ensure we have multiple classes to classify
-              if df_tree['Supply_Chain_Agility'].nunique() > 1:
-                  y_tree = LabelEncoder().fit_transform(df_tree['Supply_Chain_Agility'])
-                
-                  # Train-test split
-                  X_train_tree, X_test_tree, y_train_tree, y_test_tree = train_test_split(
-                      X_tree, y_tree, test_size=0.2, random_state=42)
-                
-                  # Create and fit model
-                  tree_model = DecisionTreeClassifier()
-                  tree_model.fit(X_train_tree, y_train_tree)
-                
-                  # Evaluate
-                  y_pred_tree = tree_model.predict(X_test_tree)
-                  accuracy = accuracy_score(y_test_tree, y_pred_tree)
-                
-                  st.metric("Accuracy", f"{accuracy:.3f}")
-                
-                  # Feature importance
-                  importance_df = pd.DataFrame({
-                      'Feature': existing_features,
-                      'Importance': tree_model.feature_importances_
-                  }).sort_values('Importance', ascending=False)
-                
-                  st.write("Feature Importance:")
-                  st.dataframe(importance_df)
-              else:
-                  st.warning("Only one class found in Supply_Chain_Agility - cannot perform classification")
-          else:
-              st.warning("Required features not found in dataset")
-      else:
-          st.warning("Supply_Chain_Agility column not found in dataset")
-    
-    elif model_type == "Carbon Emissions Prediction (Random Forest)":
-      st.markdown("<h3>Carbon Emissions Prediction</h3>", unsafe_allow_html=True)
-      st.write("Predicts carbon emissions using Random Forest regression")
-    
-     if 'Carbon_Emissions_(kg_CO2e)' in df.columns:
-        # Prepare data
-        features_rf = [
-            'Energy_Consumption_(MWh)', 'Use_of_Renewable_Energy_(%)',
-            'Recycling_Rate_(%)', 'Green_Packaging_Usage_(%)',
-            'Total_Implementation_Cost'
-        ]
-        existing_features = [f for f in features_rf if f in df.columns]
+        # Evaluate models
+        results = []
+        feature_importances = {}
         
-        if len(existing_features) > 0:
-            df_rf = df.dropna(subset=['Carbon_Emissions_(kg_CO2e)'] + existing_features)
+        for name, model in models.items():
+            # Train model
+            model.fit(X_train, y_train)
             
-            # Check for duplicate rows
-            if df_rf.duplicated().sum() > 0:
-                st.warning(f"Found {df_rf.duplicated().sum()} duplicate rows - removing them")
-                df_rf = df_rf.drop_duplicates()
+            # Predictions
+            y_pred = model.predict(X_test)
             
-            X_rf = df_rf[existing_features]
-            y_rf = df_rf['Carbon_Emissions_(kg_CO2e)']
+            # Metrics
+            rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+            r2 = r2_score(y_test, y_pred)
             
-            # Add parameter controls
-            col1, col2 = st.columns(2)
-            with col1:
-                n_estimators = st.slider("Number of trees", 10, 200, 50)
-            with col2:
-                max_depth = st.slider("Max tree depth", 2, 20, 5)
+            results.append({
+                "Model": name,
+                "RMSE": rmse,
+                "R²": r2
+            })
             
-            # Train-test split with stratification if possible
-            X_train_rf, X_test_rf, y_train_rf, y_test_rf = train_test_split(
-                X_rf, y_rf, test_size=0.3, random_state=42)  # Increased test size
-            
-            # Create and fit model with constrained parameters
-            rf_model = RandomForestRegressor(
-                n_estimators=n_estimators,
-                max_depth=max_depth,
-                min_samples_split=5,  # Require at least 5 samples to split
-                random_state=42
-            )
-            rf_model.fit(X_train_rf, y_train_rf)
-            
-            # Evaluate
-            y_pred_rf = rf_model.predict(X_test_rf)
-            r2 = r2_score(y_test_rf, y_pred_rf)
-            rmse = np.sqrt(mean_squared_error(y_test_rf, y_pred_rf))
-            
-            # Cross-validation for more reliable metrics
-            from sklearn.model_selection import cross_val_score
-            cv_scores = cross_val_score(rf_model, X_rf, y_rf, cv=5, scoring='r2')
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("R² Score", f"{r2:.3f}")
-            with col2:
-                st.metric("RMSE", f"{rmse:.3f}")
-            with col3:
-                st.metric("CV R² (mean)", f"{np.mean(cv_scores):.3f}")
-            
-            # Feature importance
-            importance_df = pd.DataFrame({
-                'Feature': existing_features,
-                'Importance': rf_model.feature_importances_
-            }).sort_values('Importance', ascending=False)
-            
-            st.write("Feature Importance:")
-            st.dataframe(importance_df)
-            
-            # Plot actual vs predicted
-            fig = px.scatter(
-                x=y_test_rf, y=y_pred_rf,
-                labels={'x': 'Actual', 'y': 'Predicted'},
-                title='Actual vs Predicted Carbon Emissions',
-                trendline='ols'
-            )
-            fig.add_shape(type="line", x0=y_test_rf.min(), y0=y_test_rf.min(),
-                         x1=y_test_rf.max(), y1=y_test_rf.max())
-            st.plotly_chart(fig)
-        else:
-            st.warning("Required features not found in dataset")
-     else:
-        st.warning("Carbon_Emissions_(kg_CO2e) column not found in dataset")
-    
-    elif model_type == "Sustainability Practices Classification (Gradient Boosting)":
-        st.markdown("<h3>Sustainability Practices Classification</h3>", unsafe_allow_html=True)
-        st.write("Classifies sustainability practices using Gradient Boosting")
+            # Store feature importances if available
+            if hasattr(model, 'feature_importances_'):
+                feature_importances[name] = {
+                    "features": selected_features,
+                    "importance": model.feature_importances_
+                }
         
-        if 'Sustainability_Practices' in df.columns:
-            # Prepare data
-            features_gb = [
-                'Use_of_Renewable_Energy_(%)', 'Green_Packaging_Usage_(%)',
-                'Recycling_Rate_(%)', 'Carbon_Emissions_(kg_CO2e)'
-            ]
-            existing_features = [f for f in features_gb if f in df.columns]
-            
-            if len(existing_features) > 0:
-                df_gb = df.dropna(subset=['Sustainability_Practices'] + existing_features)
-                X_gb = df_gb[existing_features]
-                y_gb = LabelEncoder().fit_transform(df_gb['Sustainability_Practices'])
-                
-                # Train-test split
-                X_train_gb, X_test_gb, y_train_gb, y_test_gb = train_test_split(
-                    X_gb, y_gb, test_size=0.2, random_state=42)
-                
-                # Create and fit model
-                gb_model = GradientBoostingClassifier()
-                gb_model.fit(X_train_gb, y_train_gb)
-                
-                # Evaluate
-                y_pred_gb = gb_model.predict(X_test_gb)
-                accuracy = accuracy_score(y_test_gb, y_pred_gb)
-                
-                st.metric("Accuracy", f"{accuracy:.3f}")
-                
-                # Feature importance
-                importance_df = pd.DataFrame({
-                    'Feature': existing_features,
-                    'Importance': gb_model.feature_importances_
-                }).sort_values('Importance', ascending=False)
-                
-                st.write("Feature Importance:")
-                st.dataframe(importance_df)
-            else:
-                st.warning("Required features not found in dataset")
-        else:
-            st.warning("Sustainability_Practices column not found in dataset")
-    
-    elif model_type == "Operational Clustering (K-Means)":
-        st.markdown("<h3>Operational Performance Clustering</h3>", unsafe_allow_html=True)
-        st.write("Groups companies into clusters based on operational metrics using K-Means")
+        # Display results
+        st.markdown("### Model Performance Comparison")
+        results_df = pd.DataFrame(results).sort_values("R²", ascending=False)
+        st.dataframe(results_df.style.format({"RMSE": "{:.2f}", "R²": "{:.2f}"}))
         
-        # Prepare data
-        features_kmeans = [
-            'Inventory_Accuracy_(%)', 'Transportation_Cost_Efficiency_(%)',
-            'Operational_Efficiency_Score', 'Supply_Chain_Risk_(%)',
-            'Supplier_Relationship_Score'
-        ]
-        existing_features = [f for f in features_kmeans if f in df.columns]
+        # Best model insights
+        best_model = results_df.iloc[0]
+        st.markdown(f"""
+        **Best Model:** {best_model['Model']}  
+        - **R²:** {best_model['R²']:.2f} (1.0 is perfect prediction)  
+        - **RMSE:** {best_model['RMSE']:.2f} (lower is better)
+        """)
         
-        if len(existing_features) > 0:
-            df_kmeans = df[existing_features].dropna()
+        # Feature importance visualization
+        if feature_importances:
+            st.markdown("### Feature Importance (Top Models)")
             
-            # Scale data
-            scaler = StandardScaler()
-            X_kmeans = scaler.fit_transform(df_kmeans)
+            # Show feature importance for tree-based models
+            tab1, tab2 = st.tabs(["Random Forest", "Gradient Boosting"])
             
-            # Determine optimal clusters (elbow method)
-            distortions = []
-            K = range(1, 10)
-            for k in K:
-                kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
-                kmeans.fit(X_kmeans)
-                distortions.append(kmeans.inertia_)
-            
-            # Plot elbow curve
-            fig1 = px.line(x=list(K), y=distortions, 
-                          labels={'x': 'Number of clusters', 'y': 'Distortion'},
-                          title='Elbow Method for Optimal K')
-            st.plotly_chart(fig1)
-            
-            # Let user select number of clusters
-            n_clusters = st.slider("Select number of clusters", 2, 8, 3)
-            
-            # Fit K-Means with selected clusters
-            kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-            kmeans.fit(X_kmeans)
-            
-            # Add cluster labels to dataframe
-            df_kmeans['Cluster'] = kmeans.labels_
-            
-            # Show cluster distribution
-            st.write("Cluster Distribution:")
-            st.bar_chart(df_kmeans['Cluster'].value_counts())
-            
-            # Show cluster characteristics
-            cluster_means = df_kmeans.groupby('Cluster').mean()
-            st.write("Cluster Characteristics (mean values):")
-            st.dataframe(cluster_means)
-        else:
-            st.warning("Required features not found in dataset")
-   
-                
-    else:  # Predict SCM Type
-        st.markdown("<h3>SCM Type Classification</h3>", unsafe_allow_html=True)
-        
-        if 'SCM_Type' in df.columns:
-            # Feature selection
-            feature_cols = [
-                'Supplier_Count', 'Inventory_Turnover_Ratio', 'Lead_Time_(days)',
-                'Order_Fulfillment_Rate_(%)', 'Customer_Satisfaction_(%)',
-                'Environmental_Impact_Score', 'Supplier_Lead_Time_Variability_(days)',
-                'Inventory_Accuracy_(%)', 'Transportation_Cost_Efficiency_(%)']
-            
-            # Check which features exist
-            existing_features = [col for col in feature_cols if col in df.columns]
-            
-            if len(existing_features) > 2:
-                # Get the data ready
-                X = df[existing_features].copy()
-                y = df['SCM_Type']
-                
-                # Handle nulls in features
-                X = X.fillna(X.mean())
-                
-                # Encode the target
-                le = LabelEncoder()
-                y_encoded = le.fit_transform(y)
-                
-                # Train-test split
-                X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, random_state=42)
-                
-                # Train model
-                model = RandomForestClassifier(random_state=42)
-                model.fit(X_train, y_train)
-                predictions = model.predict(X_test)
-                
-                # Metrics
-                class_report = classification_report(y_test, predictions, output_dict=True)
-                accuracy = class_report['accuracy']
-                
-                # Display metrics
-                st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
-                st.metric("Classification Accuracy", f"{accuracy:.4f}")
-                st.markdown("</div>", unsafe_allow_html=True)
-                
-                # Display classification report as table
-                report_df = pd.DataFrame(class_report).transpose()
-                st.write("Classification Report:")
-                st.dataframe(report_df.style.format("{:.4f}"))
-                
-                # Feature importance
-                importances = pd.DataFrame({
-                    'Feature': existing_features,
-                    'Importance': model.feature_importances_
-                }).sort_values('Importance', ascending=False)
-                
-                fig = px.bar(
-                    importances,
-                    x='Feature',
-                    y='Importance',
-                    title='Feature Importance for SCM Type Classification',
-                    labels={'Feature': 'Feature', 'Importance': 'Importance'},
-                    template='plotly_white'
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Create a sample prediction tool
-                st.markdown("<h3>SCM Type Prediction Tool</h3>", unsafe_allow_html=True)
-                st.write("Adjust the values below to see the predicted SCM Type for a company with these characteristics:")
-                
-                # Create sliders for feature input
-                feature_inputs = {}
-                for feature in existing_features:
-                    min_val = float(df[feature].min())
-                    max_val = float(df[feature].max())
-                    mean_val = float(df[feature].mean())
-                    
-                    feature_inputs[feature] = st.slider(
-                        f"{feature.replace('_', ' ')}",
-                        min_value=min_val,
-                        max_value=max_val,
-                        value=mean_val,
-                        step=(max_val - min_val) / 100
+            with tab1:
+                if "Random Forest" in feature_importances:
+                    fig = px.bar(
+                        x=feature_importances["Random Forest"]["features"],
+                        y=feature_importances["Random Forest"]["importance"],
+                        labels={'x': 'Feature', 'y': 'Importance'},
+                        title="Random Forest Feature Importance"
                     )
-                
-                # Create input dataframe
-                input_df = pd.DataFrame([feature_inputs])
-                
-                # Make prediction
-                prediction = model.predict(input_df)[0]
-                predicted_class = le.inverse_transform([prediction])[0]
-                
-                st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
-                st.subheader("Predicted SCM Type")
-                st.info(f"{predicted_class}")
-                st.markdown("</div>", unsafe_allow_html=True)
-
-# About page
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            with tab2:
+                if "Gradient Boosting" in feature_importances:
+                    fig = px.bar(
+                        x=feature_importances["Gradient Boosting"]["features"],
+                        y=feature_importances["Gradient Boosting"]["importance"],
+                        labels={'x': 'Feature', 'y': 'Importance'},
+                        title="Gradient Boosting Feature Importance"
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+        
+        # Actual vs Predicted plot for best model
+        st.markdown("### Actual vs Predicted Values")
+        best_model_instance = models[best_model['Model']]
+        y_pred = best_model_instance.predict(X_test)
+        
+        fig = px.scatter(
+            x=y_test, y=y_pred,
+            labels={'x': 'Actual', 'y': 'Predicted'},
+            title=f'{best_model["Model"]} Predictions vs Actual',
+            trendline='ols'
+        )
+        fig.add_shape(type="line", x0=y_test.min(), y0=y_test.min(),
+                     x1=y_test.max(), y1=y_test.max())
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Key insights
+        st.markdown("### Key Insights")
+        st.write(f"""
+        1. **Best Performing Model:** {best_model['Model']} works best for predicting {target_var.replace('_', ' ')}
+        2. **Feature Importance:** The most important features are shown above
+        3. **Model Fit:** R² of {best_model['R²']:.2f} indicates {'strong' if best_model['R²'] > 0.7 else 'moderate' if best_model['R²'] > 0.4 else 'weak'} relationship
+        4. **Error Range:** Average prediction error is ±{best_model['RMSE']:.2f} units
+        """)
+    else:
+        st.warning("Please select both a target variable and features to proceed")# About page
 elif page == "About":
     st.markdown("<h2 class='sub-header'>About This Dashboard</h2>", unsafe_allow_html=True)
     
