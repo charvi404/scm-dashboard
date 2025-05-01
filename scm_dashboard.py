@@ -614,144 +614,265 @@ elif page == "Operational Efficiency":
 elif page == "Predictive Modeling":
     st.markdown("<h2 class='sub-header'>Predictive Model Comparison</h2>", unsafe_allow_html=True)
     
-    st.write("""
-    Compare how different models perform at predicting key supply chain metrics.
-    """)
+    # Create tabs for different prediction tasks
+    pred_tab1, pred_tab2 = st.tabs(["Predict Metrics", "SCM Practice Recommendation"])
     
-    try:
-        # Target selection
-        available_targets = [
-            'Revenue_Growth_Rate_out_of_(15)',
-            'Operational_Efficiency_Score', 
-            'Customer_Satisfaction_(%)',
-            'Lead_Time_(days)'
-        ]
-        # Only show targets that exist in the dataframe
-        valid_targets = [t for t in available_targets if t in df.columns]
-        
-        if not valid_targets:
-            st.warning("No valid target variables found in the dataset")
-            st.stop()
-            
-        target_var = st.selectbox("Select target variable to predict:", valid_targets)
-        
-        # Feature selection - auto-select relevant numeric features
-        numeric_features = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
-        feature_options = [f for f in numeric_features if f != target_var and f in df.columns]
-        
-        if not feature_options:
-            st.warning("No valid features found for prediction")
-            st.stop()
-            
-        selected_features = st.multiselect(
-            "Select features to use:", 
-            feature_options,
-            default=feature_options[:min(5, len(feature_options))]
-        )
-        
-        if not selected_features:
-            st.warning("Please select at least one feature")
-            st.stop()
-
-        # Prepare data
-        model_df = df[[target_var] + selected_features].dropna()
-        
-        if len(model_df) < 20:
-            st.warning(f"Only {len(model_df)} samples available after cleaning - too few for reliable modeling")
-            st.stop()
-            
-        X = model_df[selected_features]
-        y = model_df[target_var]
-        
-        # Train-test split
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.3, random_state=42
-        )
-        
-        # Model selection - simplified with constrained parameters
-        models = {
-            "Linear Regression": LinearRegression(),
-            "Decision Tree": DecisionTreeRegressor(max_depth=3, random_state=42),
-            "Random Forest": RandomForestRegressor(
-                n_estimators=50, 
-                max_depth=3, 
-                random_state=42
-            ),
-            "Gradient Boosting": GradientBoostingRegressor(
-                n_estimators=50, 
-                max_depth=3, 
-                random_state=42
-            )
-        }
-        
-        # Evaluate models
-        results = []
-        for name, model in models.items():
-            try:
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
-                rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-                r2 = r2_score(y_test, y_pred)
-                results.append({
-                    "Model": name,
-                    "RMSE": f"{rmse:.2f}",
-                    "R²": f"{r2:.2f}",
-                    "Features": ", ".join(selected_features[:3]) + ("..." if len(selected_features)>3 else "")
-                })
-            except Exception as e:
-                st.error(f"Error with {name}: {str(e)}")
-                continue
-        
-        if not results:
-            st.error("No models could be successfully trained")
-            st.stop()
-            
-        # Display results
-        st.markdown("### Model Performance")
-        results_df = pd.DataFrame(results)
-        st.dataframe(
-            results_df.sort_values("R²", ascending=False),
-            hide_index=True
-        )
-        
-        # Best model insights
-        best_row = results_df.iloc[0]
-        st.markdown(f"""
-        **Best Model:** `{best_row['Model']}`  
-        - **R²:** {best_row['R²']} (1.0 is perfect)  
-        - **RMSE:** {best_row['RMSE']} (lower is better)
+    with pred_tab1:
+        st.write("""
+        Compare how different models perform at predicting key supply chain metrics.
         """)
         
-        # Feature importance for tree models
-        st.markdown("### Feature Importance")
-        tree_models = {
-            "Decision Tree": models["Decision Tree"],
-            "Random Forest": models["Random Forest"],
-            "Gradient Boosting": models["Gradient Boosting"]
-        }
+        try:
+            # Target selection
+            available_targets = [
+                'Revenue_Growth_Rate_out_of_(15)',
+                'Operational_Efficiency_Score', 
+                'Customer_Satisfaction_(%)',
+                'Lead_Time_(days)'
+            ]
+            # Only show targets that exist in the dataframe
+            valid_targets = [t for t in available_targets if t in df.columns]
+            
+            if not valid_targets:
+                st.warning("No valid target variables found in the dataset")
+                st.stop()
+                
+            target_var = st.selectbox("Select target variable to predict:", valid_targets)
+            
+            # Feature selection - auto-select relevant numeric features
+            numeric_features = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
+            feature_options = [f for f in numeric_features if f != target_var and f in df.columns]
+            
+            if not feature_options:
+                st.warning("No valid features found for prediction")
+                st.stop()
+                
+            selected_features = st.multiselect(
+                "Select features to use:", 
+                feature_options,
+                default=feature_options[:min(5, len(feature_options))]
+            )
+            
+            if not selected_features:
+                st.warning("Please select at least one feature")
+                st.stop()
+
+            # Prepare data
+            model_df = df[[target_var] + selected_features].dropna()
+            
+            if len(model_df) < 20:
+                st.warning(f"Only {len(model_df)} samples available after cleaning - too few for reliable modeling")
+                st.stop()
+                
+            X = model_df[selected_features]
+            y = model_df[target_var]
+            
+            # Train-test split
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.3, random_state=42
+            )
+            
+            # Model selection - simplified with constrained parameters
+            models = {
+                "Linear Regression": LinearRegression(),
+                "Decision Tree": DecisionTreeRegressor(max_depth=3, random_state=42),
+                "Random Forest": RandomForestRegressor(
+                    n_estimators=50, 
+                    max_depth=3, 
+                    random_state=42
+                ),
+                "Gradient Boosting": GradientBoostingRegressor(
+                    n_estimators=50, 
+                    max_depth=3, 
+                    random_state=42
+                )
+            }
+            
+            # Evaluate models
+            results = []
+            for name, model in models.items():
+                try:
+                    model.fit(X_train, y_train)
+                    y_pred = model.predict(X_test)
+                    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+                    r2 = r2_score(y_test, y_pred)
+                    results.append({
+                        "Model": name,
+                        "RMSE": f"{rmse:.2f}",
+                        "R²": f"{r2:.2f}",
+                        "Features": ", ".join(selected_features[:3]) + ("..." if len(selected_features)>3 else "")
+                    })
+                except Exception as e:
+                    st.error(f"Error with {name}: {str(e)}")
+                    continue
+            
+            if not results:
+                st.error("No models could be successfully trained")
+                st.stop()
+                
+            # Display results
+            st.markdown("### Model Performance")
+            results_df = pd.DataFrame(results)
+            st.dataframe(
+                results_df.sort_values("R²", ascending=False),
+                hide_index=True
+            )
+            
+            # Best model insights
+            best_row = results_df.iloc[0]
+            st.markdown(f"""
+            **Best Model:** `{best_row['Model']}`  
+            - **R²:** {best_row['R²']} (1.0 is perfect)  
+            - **RMSE:** {best_row['RMSE']} (lower is better)
+            """)
+            
+            # Feature importance for tree models
+            st.markdown("### Feature Importance")
+            tree_models = {
+                "Decision Tree": models["Decision Tree"],
+                "Random Forest": models["Random Forest"],
+                "Gradient Boosting": models["Gradient Boosting"]
+            }
+            
+            tabs = st.tabs(list(tree_models.keys()))
+            for tab, (name, model) in zip(tabs, tree_models.items()):
+                with tab:
+                    if hasattr(model, 'feature_importances_'):
+                        importance_df = pd.DataFrame({
+                            'Feature': selected_features,
+                            'Importance': model.feature_importances_
+                        }).sort_values('Importance', ascending=False)
+                        
+                        fig = px.bar(
+                            importance_df,
+                            x='Feature',
+                            y='Importance',
+                            title=f'{name} Feature Importance'
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.warning(f"{name} doesn't provide feature importances")
         
-        tabs = st.tabs(list(tree_models.keys()))
-        for tab, (name, model) in zip(tabs, tree_models.items()):
-            with tab:
-                if hasattr(model, 'feature_importances_'):
-                    importance_df = pd.DataFrame({
-                        'Feature': selected_features,
-                        'Importance': model.feature_importances_
-                    }).sort_values('Importance', ascending=False)
-                    
-                    fig = px.bar(
-                        importance_df,
-                        x='Feature',
-                        y='Importance',
-                        title=f'{name} Feature Importance'
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.warning(f"{name} doesn't provide feature importances")
+        except Exception as e:
+            st.error(f"An unexpected error occurred: {str(e)}")
+            st.stop()
     
-    except Exception as e:
-        st.error(f"An unexpected error occurred: {str(e)}")
-        st.stop()
+    # SCM Practice Recommendation tab
+    with pred_tab2:
+        st.markdown("### SCM Practice Recommendation System")
+        st.write("""
+        This system recommends the optimal SCM practice based on your business characteristics.
+        Enter your company details below to get a recommendation.
+        """)
+        
+        # Input form
+        with st.form("scm_recommendation_form"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                supplier_count = st.slider("Supplier Count", min_value=10, max_value=500, value=100, step=10)
+                lead_time = st.slider("Lead Time (days)", min_value=1, max_value=60, value=15, step=1)
+                order_fulfillment = st.slider("Order Fulfillment Rate (%)", min_value=70, max_value=100, value=90, step=1)
+                inventory_turnover = st.slider("Inventory Turnover Ratio", min_value=1, max_value=20, value=8, step=1)
+            
+            with col2:
+                customer_satisfaction = st.slider("Customer Satisfaction (%)", min_value=70, max_value=100, value=85, step=1)
+                supply_chain_risk = st.slider("Supply Chain Risk (%)", min_value=0, max_value=50, value=20, step=1)
+                sustainability_importance = st.slider("Sustainability Importance (1-10)", min_value=1, max_value=10, value=5, step=1)
+                cost_sensitivity = st.slider("Cost Sensitivity (1-10)", min_value=1, max_value=10, value=5, step=1)
+            
+            submitted = st.form_submit_button("Get Recommendation")
+        
+        if submitted:
+            st.markdown("### Recommendation Results")
+            
+            # Create a simple scoring model - in a real app this would be more sophisticated
+            # We'll use this to demonstrate the concept
+            
+            scores = {
+                'Agile SCM': 0,
+                'Lean Manufacturing': 0,
+                'Sustainable SCM': 0,
+                'Just-In-Time': 0,
+                'Six Sigma': 0,
+                'Green Logistics': 0,
+            }
+            
+            # Simple scoring logic
+            if lead_time < 10:
+                scores['Just-In-Time'] += 3
+                scores['Agile SCM'] += 2
+            else:
+                scores['Lean Manufacturing'] += 2
+                scores['Six Sigma'] += 1
+                
+            if supplier_count > 200:
+                scores['Agile SCM'] += 2
+            else:
+                scores['Lean Manufacturing'] += 1
+                scores['Just-In-Time'] += 2
+                
+            if order_fulfillment < 85:
+                scores['Six Sigma'] += 3
+            else:
+                scores['Lean Manufacturing'] += 1
+                
+            if inventory_turnover < 5:
+                scores['Lean Manufacturing'] += 3
+                scores['Just-In-Time'] += 2
+            else:
+                scores['Agile SCM'] += 1
+                
+            if sustainability_importance > 7:
+                scores['Sustainable SCM'] += 3
+                scores['Green Logistics'] += 3
+            
+            if cost_sensitivity > 7:
+                scores['Lean Manufacturing'] += 2
+                scores['Just-In-Time'] += 2
+                
+            if supply_chain_risk > 30:
+                scores['Agile SCM'] += 3
+            
+            # Create output
+            recommendations = pd.DataFrame({
+                'SCM Practice': list(scores.keys()),
+                'Score': list(scores.values())
+            }).sort_values('Score', ascending=False)
+            
+            # Display top recommendation
+            top_recommendation = recommendations.iloc[0]['SCM Practice']
+            
+            st.success(f"**Recommended SCM Practice: {top_recommendation}**")
+            
+            # Display all scores
+            fig = px.bar(
+                recommendations,
+                x='SCM Practice',
+                y='Score',
+                title='SCM Practice Compatibility Scores',
+                color='Score',
+                color_continuous_scale='Viridis'
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Recommendation explanation
+            explanation = {
+                'Agile SCM': "Agile SCM focuses on flexibility and responsiveness, ideal for companies with variable demand, multiple suppliers, and higher supply chain risk. It emphasizes adaptability over efficiency.",
+                'Lean Manufacturing': "Lean Manufacturing focuses on eliminating waste and optimizing processes, ideal for companies looking to reduce costs, improve inventory turnover, and streamline operations.",
+                'Sustainable SCM': "Sustainable SCM prioritizes environmental and social responsibility across the supply chain, ideal for companies with strong sustainability commitments.",
+                'Just-In-Time': "Just-In-Time minimizes inventory and emphasizes delivering products just when needed, ideal for companies with reliable suppliers, shorter lead times, and cost pressures.",
+                'Six Sigma': "Six Sigma focuses on eliminating defects and reducing variability, ideal for companies looking to improve quality, order fulfillment rates, and operational efficiency.",
+                'Green Logistics': "Green Logistics focuses on reducing environmental impact of transportation and logistics activities, ideal for companies with strong sustainability goals."
+            }
+            
+            st.markdown("### Why This Recommendation?")
+            st.write(explanation.get(top_recommendation, "No explanation available."))
+            
+            # Alternative recommendations
+            st.markdown("### Alternative Options")
+            for practice in recommendations.iloc[1:3]['SCM Practice']:
+                st.write(f"**{practice}**: {explanation.get(practice, 'No explanation available.')}")
 elif page == "About":
     st.markdown("<h2 class='sub-header'>About This Dashboard</h2>", unsafe_allow_html=True)
     
